@@ -1,0 +1,21 @@
+{
+  "name": "Hermandad Dev Environment",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-mssql.mssql",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "rangav.vscode-thunder-client"
+      ]
+    }
+  },
+
+  "forwardPorts": [3000, 1433],
+
+  "postCreateCommand": "npm install"
+}
