@@ -1,21 +1,18 @@
 {
   "name": "Hermandad Dev Environment",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "app",
-  "workspaceFolder": "/workspace",
-
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  "features": {
+    "ghcr.io/mcr/features/mssql:1": {
+      "password": "PasswordFuerte2026!"
+    }
+  },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-mssql.mssql",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
         "rangav.vscode-thunder-client"
       ]
     }
   },
-
-  "forwardPorts": [3000, 1433],
-
-  "postCreateCommand": "npm install"
+  "forwardPorts": [3000, 1433]
 }
