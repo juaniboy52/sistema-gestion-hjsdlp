@@ -1,78 +1,131 @@
 const TurnoModel = require('../models/turnoModel');
-const DevotoModel = require('../models/devotoModel');
 const { getQuery } = require('../config/database');
 
+// Función auxiliar para barajar aleatoriamente un array (Fisher-Yates shuffle)
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 const TurnoController = {
-  // POST /api/turnos/asignar
-  async asignar(req, res) {
+  // POST /api/turnos/asignar-automatico
+  async asignarAutomatico(req, res) {
     try {
       const {
-        idDevoto,
         idAnda = 1,
-        idUsuarioAsigno = 1,
         anioCuaresma = 2026,
-        numeroTurno,
-        ladoBrazo,
-        numeroBrazo,
+        cantidadTurnosProcesion = 10,
         montoQuetzales = 50.00
       } = req.body;
 
-      if (!idDevoto || !numeroTurno || !ladoBrazo || !numeroBrazo) {
-        return res.status(400).json({ mensaje: 'Faltan parámetros obligatorios para asignar el turno' });
-      }
+      const idUsuario = req.usuario ? req.usuario.idUsuario : 1;
 
-      const flanco = ladoBrazo.toUpperCase();
-      if (flanco !== 'DERECHO' && flanco !== 'IZQUIERDO') {
-        return res.status(400).json({ mensaje: 'El lado del brazo debe ser DERECHO o IZQUIERDO' });
-      }
-
-      const devoto = await DevotoModel.findById(idDevoto);
-      if (!devoto) {
-        return res.status(404).json({ mensaje: 'El devoto indicado no existe en el sistema' });
-      }
-
+      // 1. Obtener información del Anda
       const anda = await getQuery('SELECT * FROM Anda_Procesional WHERE ID_Anda = ?', [idAnda]);
       if (!anda) {
-        return res.status(404).json({ mensaje: 'El anda procesional no existe' });
+        return res.status(404).json({ mensaje: 'Anda procesional no encontrada' });
       }
 
-      const brazoNum = parseInt(numeroBrazo, 10);
-      if (brazoNum < 1 || brazoNum > anda.Brazos_Por_Lado) {
-        return res.status(400).json({
-          mensaje: `Número de brazo inválido. El anda posee ${anda.Brazos_Por_Lado} brazos por flanco (1 a ${anda.Brazos_Por_Lado})`
-        });
+      const brazosPorLado = anda.Brazos_Por_Lado; // 20 brazos
+      const totalBrazosPorTurno = brazosPorLado * 2; // 40 cargadores
+
+      // 2. Obtener devotos pendientes ordenados por estatura
+      const devotos = await TurnoModel.obtenerDevotosPendientes(idAnda, anioCuaresma);
+      if (devotos.length === 0) {
+        return res.status(400).json({ mensaje: 'No hay devotos pendientes de asignación para este año' });
       }
 
-      const turnoExistenteDevoto = await TurnoModel.verificarDevotoEnTurno(idDevoto, idAnda, anioCuaresma, numeroTurno);
-      if (turnoExistenteDevoto) {
-        return res.status(409).json({ mensaje: 'El devoto ya tiene un brazo asignado en este mismo turno' });
+      // 3. Cargar historial de años previos para cada devoto
+      const historialDevotos = new Map();
+      for (const d of devotos) {
+        const turnosPrevios = await TurnoModel.obtenerHistorialTurnosDevoto(d.ID_Devoto, idAnda, anioCuaresma);
+        historialDevotos.set(d.ID_Devoto, new Set(turnosPrevios));
       }
 
-      const brazoOcupado = await TurnoModel.verificarBrazoOcupado(idAnda, anioCuaresma, numeroTurno, flanco, brazoNum);
-      if (brazoOcupado) {
-        return res.status(409).json({
-          mensaje: `El brazo número ${brazoNum} (${flanco}) ya se encuentra asignado a otro cargador en el Turno ${numeroTurno}`
-        });
+      // 4. Mapear brazos ya ocupados este año
+      const asignadosActuales = await TurnoModel.obtenerTurnosAsignadosAnio(idAnda, anioCuaresma);
+      const matrizOcupados = new Set(
+        asignadosActuales.map(a => `${a.Numero_Turno}-${a.Lado_Brazo}-${a.Numero_Brazo}`)
+      );
+
+      const asignacionesRealizadas = [];
+      const devotosAsignadosIds = new Set();
+
+      // 5. Asignación turno por turno por bloques de altura
+      for (let turno = 1; turno <= cantidadTurnosProcesion; turno++) {
+        // Filtrar devotos candidatos para este turno que NO lo hayan cargado antes
+        const candidatos = devotos.filter(
+          d => !devotosAsignadosIds.has(d.ID_Devoto) && !historialDevotos.get(d.ID_Devoto).has(turno)
+        );
+
+        if (candidatos.length === 0) continue;
+
+        // Armar la lista de espacios disponibles para este turno
+        const espaciosDisponibles = [];
+        for (let b = 1; b <= brazosPorLado; b++) {
+          if (!matrizOcupados.has(`${turno}-DERECHO-${b}`)) {
+            espaciosDisponibles.push({ lado: 'DERECHO', brazo: b });
+          }
+          if (!matrizOcupados.has(`${turno}-IZQUIERDO-${b}`)) {
+            espaciosDisponibles.push({ lado: 'IZQUIERDO', brazo: b });
+          }
+        }
+
+        if (espaciosDisponibles.length === 0) continue;
+
+        // Tomar el lote de devotos más cercanos en estatura para llenar los espacios
+        const loteTurno = candidatos.slice(0, espaciosDisponibles.length);
+
+        // Agrupar en pares de altura similar y aleatorizar lados
+        // Ordenamos los espacios por número de brazo para que el peso baje proporcionalmente
+        espaciosDisponibles.sort((a, b) => a.brazo - b.brazo);
+
+        // Introducimos aleatoriedad controlada dentro de devotos de estaturas muy similares
+        const loteAleatorizado = shuffleArray(loteTurno);
+
+        for (let i = 0; i < loteAleatorizado.length; i++) {
+          const devoto = loteAleatorizado[i];
+          const espacio = espaciosDisponibles[i];
+
+          const comprobante = await TurnoModel.registrarAsignacionAutomatica({
+            idDevoto: devoto.ID_Devoto,
+            idAnda,
+            idUsuarioAsigno: idUsuario,
+            anioCuaresma,
+            numeroTurno: turno,
+            ladoBrazo: espacio.lado,
+            numeroBrazo: espacio.brazo,
+            montoQuetzales
+          });
+
+          devotosAsignadosIds.add(devoto.ID_Devoto);
+          matrizOcupados.add(`${turno}-${espacio.lado}-${espacio.brazo}`);
+
+          asignacionesRealizadas.push({
+            devoto: `${devoto.Nombres} ${devoto.Apellidos}`,
+            estaturaCm: devoto.Estatura_Hombro_cm,
+            turno,
+            lado: espacio.lado,
+            brazo: espacio.brazo,
+            recibo: comprobante.numeroRecibo
+          });
+        }
       }
 
-      const resultado = await TurnoModel.asignarTurnoConRecibo({
-        idDevoto,
-        idAnda,
-        idUsuarioAsigno,
-        anioCuaresma,
-        numeroTurno,
-        ladoBrazo: flanco,
-        numeroBrazo: brazoNum,
-        montoQuetzales: parseFloat(montoQuetzales)
+      return res.status(200).json({
+        mensaje: 'Asignación automática y balanceada completada con éxito',
+        totalAsignados: asignacionesRealizadas.length,
+        devotosRestantesSinAsignar: devotos.length - asignacionesRealizadas.length,
+        asignaciones: asignacionesRealizadas
       });
 
-      return res.status(201).json({
-        mensaje: 'Turno asignado e inscripción procesada con éxito',
-        comprobante: resultado
-      });
     } catch (error) {
-      console.error('Error al procesar asignación:', error);
-      return res.status(500).json({ mensaje: 'Error interno al asignar el turno procesional' });
+      console.error('Error en asignación automática:', error);
+      return res.status(500).json({ mensaje: 'Error al procesar la asignación automática balanceada' });
     }
   },
 
@@ -89,7 +142,7 @@ const TurnoController = {
       });
     } catch (error) {
       console.error('Error al listar turnos:', error);
-      return res.status(500).json({ mensaje: 'Error al consultar los turnos del anda' });
+      return res.status(500).json({ mensaje: 'Error al consultar turnos' });
     }
   },
 
@@ -97,58 +150,13 @@ const TurnoController = {
   async obtenerRecibo(req, res) {
     try {
       const { codigoValidacion } = req.params;
-
-      if (!codigoValidacion || codigoValidacion.trim().length < 10) {
-        return res.status(400).json({ mensaje: 'Código de validación no válido' });
-      }
-
-      const recibo = await TurnoModel.buscarComprobantePorCodigo(codigoValidacion.trim().toUpperCase());
-
+      const recibo = await TurnoModel.buscarComprobantePorCodigo(codigoValidacion);
       if (!recibo) {
-        return res.status(404).json({
-          valido: false,
-          mensaje: 'No se encontró ningún comprobante emitido con el código ingresado'
-        });
+        return res.status(404).json({ mensaje: 'Comprobante no encontrado' });
       }
-
-      // Estructura lista para impresión térmica o comprobante en pantalla
-      return res.status(200).json({
-        valido: true,
-        institucion: {
-          nombre: 'Hermandad de Jesús Sepultado de la Paz',
-          sede: 'Parroquia Nuestra Señora de los Remedios, Iglesia Cristo Rey',
-          ciudad: 'Guatemala, C.A.'
-        },
-        recibo: {
-          numeroRecibo: recibo.Numero_Recibo,
-          codigoValidacion: recibo.Codigo_Validacion_Recibo,
-          fechaEmision: recibo.Fecha_Transaccion,
-          cajero: recibo.Cajero_Responsable,
-          concepto: recibo.Concepto_Descripcion,
-          monto: `Q${parseFloat(recibo.Monto_Quetzales).toFixed(2)}`,
-          metodoPago: recibo.Metodo_Pago
-        },
-        devoto: {
-          idDevoto: recibo.ID_Devoto,
-          dpi: recibo.DPI,
-          nombreCompleto: `${recibo.Devoto_Nombres} ${recibo.Devoto_Apellidos}`,
-          telefono: recibo.Devoto_Telefono,
-          correo: recibo.Devoto_Correo,
-          estaturaHombroCm: `${recibo.Estatura_Hombro_cm} cm`
-        },
-        detalleTurno: {
-          anda: recibo.Nombre_Anda,
-          totalBrazosAnda: recibo.Cantidad_Total_Brazos,
-          anioCuaresma: recibo.Anio_Cuaresma,
-          numeroTurno: recibo.Numero_Turno,
-          ladoBrazo: recibo.Lado_Brazo,
-          numeroBrazo: recibo.Numero_Brazo,
-          fechaAsignacion: recibo.Fecha_Asignacion
-        }
-      });
+      return res.status(200).json({ valido: true, recibo });
     } catch (error) {
-      console.error('Error al recuperar comprobante:', error);
-      return res.status(500).json({ mensaje: 'Error interno al consultar el comprobante' });
+      return res.status(500).json({ mensaje: 'Error al consultar comprobante' });
     }
   }
 };

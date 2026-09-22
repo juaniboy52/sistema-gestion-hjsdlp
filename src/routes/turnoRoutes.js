@@ -3,13 +3,11 @@ const router = express.Router();
 const TurnoController = require('../controllers/turnoController');
 const { verificarToken, permitirRoles } = require('../middlewares/authMiddleware');
 
-// Asignar turno: Solo Administrador (1) y Tesorero/Cajero (2)
-router.post('/asignar', verificarToken, permitirRoles(1, 2), TurnoController.asignar);
+// Asignación automática balanceada (Roles 1 y 2)
+router.post('/asignar-automatico', verificarToken, permitirRoles(1, 2), TurnoController.asignarAutomatico);
 
-// Consultar lista de cargadores del anda: Solo usuarios autenticados
+// Consultas
 router.get('/anda/:idAnda/:anio', verificarToken, TurnoController.consultarPorAnda);
-
-// Consultar comprobante: Ruta pública (validada por el código de seguridad)
 router.get('/recibo/:codigoValidacion', TurnoController.obtenerRecibo);
 
 module.exports = router;

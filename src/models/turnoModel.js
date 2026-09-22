@@ -2,33 +2,51 @@ const { runQuery, getQuery, allQuery } = require('../config/database');
 const crypto = require('crypto');
 
 const TurnoModel = {
-  // Verificar si un brazo específico ya fue ocupado en ese turno y año
-  async verificarBrazoOcupado(idAnda, anioCuaresma, numeroTurno, ladoBrazo, numeroBrazo) {
-    return await getQuery(
-      `SELECT * FROM Asignacion_Turno 
-       WHERE ID_Anda = ? AND Anio_Cuaresma = ? AND Numero_Turno = ? AND Lado_Brazo = ? AND Numero_Brazo = ?`,
-      [idAnda, anioCuaresma, numeroTurno, ladoBrazo, numeroBrazo]
+  // 1. Obtener devotos inscritos activos que aún no tienen turno en el año actual
+  async obtenerDevotosPendientes(idAnda, anioCuaresma) {
+    return await allQuery(
+      `SELECT D.ID_Devoto, D.DPI, D.Nombres, D.Apellidos, D.Estatura_Hombro_cm
+       FROM Devoto D
+       WHERE D.Estado_Activo = 1
+         AND D.ID_Devoto NOT IN (
+           SELECT ID_Devoto FROM Asignacion_Turno 
+           WHERE ID_Anda = ? AND Anio_Cuaresma = ?
+         )
+       ORDER BY D.Estatura_Hombro_cm DESC`,
+      [idAnda, anioCuaresma]
     );
   },
 
-  // Verificar si el devoto ya tiene turno en esa misma anda, año y número de turno
-  async verificarDevotoEnTurno(idDevoto, idAnda, anioCuaresma, numeroTurno) {
-    return await getQuery(
-      `SELECT * FROM Asignacion_Turno 
-       WHERE ID_Devoto = ? AND ID_Anda = ? AND Anio_Cuaresma = ? AND Numero_Turno = ?`,
-      [idDevoto, idAnda, anioCuaresma, numeroTurno]
+  // 2. Obtener historial de números de turnos cargados por un devoto en años anteriores
+  async obtenerHistorialTurnosDevoto(idDevoto, idAnda, anioCuaresmaActual) {
+    const filas = await allQuery(
+      `SELECT DISTINCT Numero_Turno 
+       FROM Asignacion_Turno 
+       WHERE ID_Devoto = ? AND ID_Anda = ? AND Anio_Cuaresma < ?`,
+      [idDevoto, idAnda, anioCuaresmaActual]
+    );
+    return filas.map(f => f.Numero_Turno);
+  },
+
+  // 3. Consultar los turnos ya ocupados en el año actual para no sobreescribir
+  async obtenerTurnosAsignadosAnio(idAnda, anioCuaresma) {
+    return await allQuery(
+      `SELECT Numero_Turno, Lado_Brazo, Numero_Brazo 
+       FROM Asignacion_Turno 
+       WHERE ID_Anda = ? AND Anio_Cuaresma = ?`,
+      [idAnda, anioCuaresma]
     );
   },
 
-  // Registrar asignación y generar transacción de recibo
-  async asignarTurnoConRecibo({ idDevoto, idAnda, idUsuarioAsigno, anioCuaresma, numeroTurno, ladoBrazo, numeroBrazo, montoQuetzales }) {
+  // 4. Asignación masiva dentro de una transacción con generación de recibo
+  async registrarAsignacionAutomatica({ idDevoto, idAnda, idUsuarioAsigno, anioCuaresma, numeroTurno, ladoBrazo, numeroBrazo, montoQuetzales = 50.00 }) {
     await runQuery(
       `INSERT INTO Asignacion_Turno (ID_Devoto, ID_Anda, ID_Usuario_Asigno, Anio_Cuaresma, Numero_Turno, Lado_Brazo, Numero_Brazo)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [idDevoto, idAnda, idUsuarioAsigno, anioCuaresma, numeroTurno, ladoBrazo, numeroBrazo]
     );
 
-    const timestamp = Date.now().toString().slice(-6);
+    const timestamp = Date.now().toString().slice(-6) + Math.floor(Math.random() * 100);
     const numeroRecibo = `REC-${anioCuaresma}-${timestamp}`;
     const codigoValidacion = crypto.randomBytes(16).toString('hex').toUpperCase();
 
@@ -39,41 +57,31 @@ const TurnoModel = {
         numeroRecibo,
         idUsuarioAsigno,
         idDevoto,
-        `Inscripción Turno No. ${numeroTurno} (${ladoBrazo} - Brazo ${numeroBrazo}) - Cuaresma ${anioCuaresma}`,
+        `Inscripción Automática Turno No. ${numeroTurno} (${ladoBrazo} - Brazo ${numeroBrazo}) - Cuaresma ${anioCuaresma}`,
         montoQuetzales,
         codigoValidacion
       ]
     );
 
-    return {
-      numeroRecibo,
-      codigoValidacion,
-      montoQuetzales,
-      turno: {
-        idDevoto,
-        idAnda,
-        anioCuaresma,
-        numeroTurno,
-        ladoBrazo,
-        numeroBrazo
-      }
-    };
+    return { numeroRecibo, codigoValidacion };
   },
 
-  // Listar turnos asignados por Anda y Año
+  // 5. Listar turnos asignados por Anda y Año
   async listarTurnosPorAnda(idAnda, anioCuaresma) {
     return await allQuery(
       `SELECT A.ID_Asignacion, A.Numero_Turno, A.Lado_Brazo, A.Numero_Brazo, A.Fecha_Asignacion,
-              D.DPI, D.Nombres, D.Apellidos, D.Estatura_Hombro_cm
+              D.DPI, D.Nombres, D.Apellidos, D.Estatura_Hombro_cm,
+              T.Numero_Recibo, T.Codigo_Validacion_Recibo
        FROM Asignacion_Turno A
        INNER JOIN Devoto D ON A.ID_Devoto = D.ID_Devoto
+       LEFT JOIN Transaccion_Financiera T ON T.ID_Devoto = D.ID_Devoto AND T.Concepto_Descripcion LIKE '%' || A.Numero_Turno || '%'
        WHERE A.ID_Anda = ? AND A.Anio_Cuaresma = ?
        ORDER BY A.Numero_Turno ASC, A.Lado_Brazo ASC, A.Numero_Brazo ASC`,
       [idAnda, anioCuaresma]
     );
   },
 
-  // Consultar comprobante completo mediante código de validación único
+  // 6. Consultar comprobante por código de validación
   async buscarComprobantePorCodigo(codigoValidacion) {
     return await getQuery(
       `SELECT 

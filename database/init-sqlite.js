@@ -34,7 +34,7 @@ async function main() {
       Apellidos TEXT NOT NULL,
       Telefono TEXT NOT NULL,
       Correo_Electronico TEXT NOT NULL,
-      Estatura_Hombro_cm REAL NOT NULL,
+      Estatura_Hombro_cm INTEGER NOT NULL,
       Password_Hash TEXT,
       Cuenta_Activada INTEGER DEFAULT 0,
       Primer_Ingreso INTEGER DEFAULT 1,

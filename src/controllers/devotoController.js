@@ -37,30 +37,30 @@ const DevotoController = {
     try {
       const { dpi, nombres, apellidos, telefono, correo, estaturaHombroCm } = req.body;
 
-      // 1. Validaciones básicas
-      if (!dpi || !nombres || !apellidos || !telefono || !correo || !estaturaHombroCm) {
+      if (!dpi || !nombres || !apellidos || !telefono || !correo || estaturaHombroCm === undefined) {
         return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
       }
 
-      // 2. Validación de formato de DPI (13 dígitos numéricos de Guatemala)
+      // Validación de DPI: 13 dígitos numéricos
       const dpiRegex = /^[0-9]{13}$/;
       if (!dpiRegex.test(dpi)) {
         return res.status(400).json({ mensaje: 'El DPI debe contener exactamente 13 dígitos numéricos' });
       }
 
-      // 3. Validación de estatura lógica en centímetros
-      const estatura = parseFloat(estaturaHombroCm);
-      if (isNaN(estatura) || estatura < 120 || estatura > 210) {
-        return res.status(400).json({ mensaje: 'La estatura de hombro debe ser un valor válido entre 120 cm y 210 cm' });
+      // Validación de Estatura: Entero estricto en centímetros
+      const estatura = Number(estaturaHombroCm);
+      if (!Number.isInteger(estatura) || estatura < 120 || estatura > 210) {
+        return res.status(400).json({ 
+          mensaje: 'La estatura de hombro debe ser un número entero en centímetros entre 120 y 210 (sin decimales)' 
+        });
       }
 
-      // 4. Verificar duplicidad de DPI
+      // Evitar duplicidad de DPI
       const existeDevoto = await DevotoModel.findByDPI(dpi);
       if (existeDevoto) {
         return res.status(409).json({ mensaje: 'Ya existe un devoto registrado con este número de DPI' });
       }
 
-      // 5. Inserción
       const nuevoDevoto = await DevotoModel.create({
         dpi,
         nombres,
