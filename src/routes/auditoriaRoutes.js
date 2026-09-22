@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const AuditoriaModel = require('../models/auditoriaModel');
+const { verificarToken, permitirRoles } = require('../middlewares/authMiddleware');
 
-router.get('/', async (req, res) => {
+// Exclusivo Administrador General (Rol 1)
+router.get('/', verificarToken, permitirRoles(1), async (req, res) => {
   try {
     const bitacora = await AuditoriaModel.listarUltimos(50);
     return res.status(200).json({
