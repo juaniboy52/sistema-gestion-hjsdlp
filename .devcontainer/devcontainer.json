@@ -1,18 +1,5 @@
 {
-  "name": "Hermandad Dev Environment",
+  "name": "Hermandad Node Environment",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
-  "features": {
-    "ghcr.io/mcr/features/mssql:1": {
-      "password": "PasswordFuerte2026!"
-    }
-  },
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-mssql.mssql",
-        "rangav.vscode-thunder-client"
-      ]
-    }
-  },
-  "forwardPorts": [3000, 1433]
+  "forwardPorts": [3000]
 }
