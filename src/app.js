@@ -8,6 +8,7 @@ const devotoRoutes = require('./routes/devotoRoutes');
 const turnoRoutes = require('./routes/turnoRoutes');
 const enseresRoutes = require('./routes/enseresRoutes');
 const auditoriaRoutes = require('./routes/auditoriaRoutes');
+const reportesRoutes = require('./routes/reportesRoutes');
 
 const app = express();
 
@@ -15,10 +16,10 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Registro global de auditoría en mutaciones
+// Registro global de auditoría
 app.use(auditMiddleware);
 
-// Rutas base
+// Rutas API
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     estado: 'OK',
@@ -27,12 +28,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Enrutadores
 app.use('/api/auth', authRoutes);
 app.use('/api/devotos', devotoRoutes);
 app.use('/api/turnos', turnoRoutes);
 app.use('/api/enseres', enseresRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 // Manejador 404
 app.use((req, res) => {
