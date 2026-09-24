@@ -1,131 +1,84 @@
 const TurnoModel = require('../models/turnoModel');
+const DevotoModel = require('../models/devotoModel');
 const { getQuery } = require('../config/database');
 
-// Función auxiliar para barajar aleatoriamente un array (Fisher-Yates shuffle)
-function shuffleArray(array) {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 const TurnoController = {
-  // POST /api/turnos/asignar-automatico
-  async asignarAutomatico(req, res) {
+  // POST /api/turnos/asignar
+  async asignar(req, res) {
     try {
       const {
+        idDevoto,
         idAnda = 1,
         anioCuaresma = 2026,
-        cantidadTurnosProcesion = 10,
+        numeroTurno,
+        ladoBrazo,
+        numeroBrazo,
         montoQuetzales = 50.00
       } = req.body;
 
-      const idUsuario = req.usuario ? req.usuario.idUsuario : 1;
+      const idUsuarioAsigno = req.usuario ? req.usuario.idUsuario : 1;
+      const config = req.configTemporada;
 
-      // 1. Obtener información del Anda
-      const anda = await getQuery('SELECT * FROM Anda_Procesional WHERE ID_Anda = ?', [idAnda]);
-      if (!anda) {
-        return res.status(404).json({ mensaje: 'Anda procesional no encontrada' });
+      if (!idDevoto || !numeroTurno || !ladoBrazo || !numeroBrazo) {
+        return res.status(400).json({ mensaje: 'Faltan parámetros obligatorios' });
       }
 
-      const brazosPorLado = anda.Brazos_Por_Lado; // 20 brazos
-      const totalBrazosPorTurno = brazosPorLado * 2; // 40 cargadores
-
-      // 2. Obtener devotos pendientes ordenados por estatura
-      const devotos = await TurnoModel.obtenerDevotosPendientes(idAnda, anioCuaresma);
-      if (devotos.length === 0) {
-        return res.status(400).json({ mensaje: 'No hay devotos pendientes de asignación para este año' });
+      // 1. Validar que el turno esté dentro del total permitido (ej: 1 al 10)
+      const turnoNum = parseInt(numeroTurno, 10);
+      if (turnoNum < 1 || turnoNum > config.Total_Turnos_Procesion) {
+        return res.status(400).json({
+          mensaje: `Número de turno inválido. La procesión cuenta con ${config.Total_Turnos_Procesion} turnos en total (1 a ${config.Total_Turnos_Procesion}).`
+        });
       }
 
-      // 3. Cargar historial de años previos para cada devoto
-      const historialDevotos = new Map();
-      for (const d of devotos) {
-        const turnosPrevios = await TurnoModel.obtenerHistorialTurnosDevoto(d.ID_Devoto, idAnda, anioCuaresma);
-        historialDevotos.set(d.ID_Devoto, new Set(turnosPrevios));
-      }
-
-      // 4. Mapear brazos ya ocupados este año
-      const asignadosActuales = await TurnoModel.obtenerTurnosAsignadosAnio(idAnda, anioCuaresma);
-      const matrizOcupados = new Set(
-        asignadosActuales.map(a => `${a.Numero_Turno}-${a.Lado_Brazo}-${a.Numero_Brazo}`)
+      // 2. Validar regla de múltiples turnos por devoto
+      const conteoTurnosDevoto = await getQuery(
+        'SELECT COUNT(ID_Asignacion) as total FROM Asignacion_Turno WHERE ID_Devoto = ? AND ID_Anda = ? AND Anio_Cuaresma = ?',
+        [idDevoto, idAnda, anioCuaresma]
       );
 
-      const asignacionesRealizadas = [];
-      const devotosAsignadosIds = new Set();
-
-      // 5. Asignación turno por turno por bloques de altura
-      for (let turno = 1; turno <= cantidadTurnosProcesion; turno++) {
-        // Filtrar devotos candidatos para este turno que NO lo hayan cargado antes
-        const candidatos = devotos.filter(
-          d => !devotosAsignadosIds.has(d.ID_Devoto) && !historialDevotos.get(d.ID_Devoto).has(turno)
-        );
-
-        if (candidatos.length === 0) continue;
-
-        // Armar la lista de espacios disponibles para este turno
-        const espaciosDisponibles = [];
-        for (let b = 1; b <= brazosPorLado; b++) {
-          if (!matrizOcupados.has(`${turno}-DERECHO-${b}`)) {
-            espaciosDisponibles.push({ lado: 'DERECHO', brazo: b });
-          }
-          if (!matrizOcupados.has(`${turno}-IZQUIERDO-${b}`)) {
-            espaciosDisponibles.push({ lado: 'IZQUIERDO', brazo: b });
-          }
-        }
-
-        if (espaciosDisponibles.length === 0) continue;
-
-        // Tomar el lote de devotos más cercanos en estatura para llenar los espacios
-        const loteTurno = candidatos.slice(0, espaciosDisponibles.length);
-
-        // Agrupar en pares de altura similar y aleatorizar lados
-        // Ordenamos los espacios por número de brazo para que el peso baje proporcionalmente
-        espaciosDisponibles.sort((a, b) => a.brazo - b.brazo);
-
-        // Introducimos aleatoriedad controlada dentro de devotos de estaturas muy similares
-        const loteAleatorizado = shuffleArray(loteTurno);
-
-        for (let i = 0; i < loteAleatorizado.length; i++) {
-          const devoto = loteAleatorizado[i];
-          const espacio = espaciosDisponibles[i];
-
-          const comprobante = await TurnoModel.registrarAsignacionAutomatica({
-            idDevoto: devoto.ID_Devoto,
-            idAnda,
-            idUsuarioAsigno: idUsuario,
-            anioCuaresma,
-            numeroTurno: turno,
-            ladoBrazo: espacio.lado,
-            numeroBrazo: espacio.brazo,
-            montoQuetzales
-          });
-
-          devotosAsignadosIds.add(devoto.ID_Devoto);
-          matrizOcupados.add(`${turno}-${espacio.lado}-${espacio.brazo}`);
-
-          asignacionesRealizadas.push({
-            devoto: `${devoto.Nombres} ${devoto.Apellidos}`,
-            estaturaCm: devoto.Estatura_Hombro_cm,
-            turno,
-            lado: espacio.lado,
-            brazo: espacio.brazo,
-            recibo: comprobante.numeroRecibo
-          });
-        }
+      if (config.Permitir_Multiples_Turnos === 1 && conteoTurnosDevoto.total >= config.Maximo_Turnos_Por_Devoto) {
+        return res.status(409).json({
+          mensaje: `Límite alcanzado: El devoto ya cuenta con ${conteoTurnosDevoto.total} turnos asignados (máximo permitido: ${config.Maximo_Turnos_Por_Devoto})`
+        });
       }
 
-      return res.status(200).json({
-        mensaje: 'Asignación automática y balanceada completada con éxito',
-        totalAsignados: asignacionesRealizadas.length,
-        devotosRestantesSinAsignar: devotos.length - asignacionesRealizadas.length,
-        asignaciones: asignacionesRealizadas
+      // 3. Prohibir dos brazos en el MISMO turno
+      const enMismoTurno = await TurnoModel.verificarDevotoEnTurno(idDevoto, idAnda, anioCuaresma, turnoNum);
+      if (enMismoTurno) {
+        return res.status(409).json({
+          mensaje: `El devoto ya tiene un brazo asignado en el Turno No. ${turnoNum}. Debe elegir un turno diferente.`
+        });
+      }
+
+      // 4. Validar colisión física del brazo solicitado
+      const flanco = ladoBrazo.toUpperCase();
+      const brazoOcupado = await TurnoModel.verificarBrazoOcupado(idAnda, anioCuaresma, turnoNum, flanco, numeroBrazo);
+      if (brazoOcupado) {
+        return res.status(409).json({
+          mensaje: `El brazo ${numeroBrazo} (${flanco}) del Turno ${turnoNum} ya se encuentra ocupado.`
+        });
+      }
+
+      // 5. Asignar y generar recibo
+      const comprobante = await TurnoModel.asignarTurnoConRecibo({
+        idDevoto,
+        idAnda,
+        idUsuarioAsigno,
+        anioCuaresma,
+        numeroTurno: turnoNum,
+        ladoBrazo: flanco,
+        numeroBrazo,
+        montoQuetzales
       });
 
+      return res.status(201).json({
+        mensaje: `Turno No. ${turnoNum} asignado exitosamente al devoto`,
+        comprobante
+      });
     } catch (error) {
-      console.error('Error en asignación automática:', error);
-      return res.status(500).json({ mensaje: 'Error al procesar la asignación automática balanceada' });
+      console.error('Error al asignar turno:', error);
+      return res.status(500).json({ mensaje: 'Error interno al asignar turno' });
     }
   },
 
@@ -141,7 +94,6 @@ const TurnoController = {
         turnos
       });
     } catch (error) {
-      console.error('Error al listar turnos:', error);
       return res.status(500).json({ mensaje: 'Error al consultar turnos' });
     }
   },
@@ -156,7 +108,7 @@ const TurnoController = {
       }
       return res.status(200).json({ valido: true, recibo });
     } catch (error) {
-      return res.status(500).json({ mensaje: 'Error al consultar comprobante' });
+      return res.status(500).json({ mensaje: 'Error al consultar recibo' });
     }
   }
 };
