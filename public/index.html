@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Integral de Gestión - Hermandad de Jesús Sepultado de la Paz</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-light">
+
+  <!-- Navegación Principal -->
+  <nav id="navbar-principal" class="navbar navbar-expand-lg navbar-dark bg-morado shadow-sm d-none">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="#">
+        <i class="bi bi-cross text-warning me-2"></i>Jesús Sepultado de la Paz
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="menuPrincipal">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" onclick="navegarA('vista-devotos')"><i class="bi bi-people me-1"></i>Devotos</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegarA('vista-caja')"><i class="bi bi-cash-coin me-1"></i>Caja e Inscripciones</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="navegarA('vista-anda')"><i class="bi bi-grid-3x3 me-1"></i>Visualizador Anda</a>
+          </li>
+          <li class="nav-item" id="nav-item-reportes">
+            <a class="nav-link" href="#" onclick="navegarA('vista-reportes')"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Reportes Contables</a>
+          </li>
+          <li class="nav-item" id="nav-item-usuarios">
+            <a class="nav-link" href="#" onclick="navegarA('vista-usuarios')"><i class="bi bi-person-gear me-1"></i>Usuarios y Roles</a>
+          </li>
+          <li class="nav-item" id="nav-item-auditoria">
+            <a class="nav-link" href="#" onclick="navegarA('vista-auditoria')"><i class="bi bi-shield-lock me-1"></i>Auditoría</a>
+          </li>
+        </ul>
+        <div class="d-flex align-items-center text-white">
+          <div class="me-3 text-end d-none d-md-block">
+            <div id="usuario-nombre" class="fw-bold small">Usuario</div>
+            <div id="usuario-rol" class="badge bg-warning text-dark">Rol</div>
+          </div>
+          <button class="btn btn-outline-light btn-sm" onclick="cerrarSesion()">
+            <i class="bi bi-box-arrow-right me-1"></i>Salir
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-4">
+
+    <!-- 1. LOGIN -->
+    <section id="vista-login" class="row justify-content-center pt-5">
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-lg rounded-4">
+          <div class="card-header bg-morado text-white text-center py-4 rounded-top-4">
+            <i class="bi bi-cross fs-1 text-warning mb-2"></i>
+            <h4 class="fw-bold mb-0">Hermandad de la Paz</h4>
+            <small class="text-light-50">Acceso al Sistema de Gestión</small>
+          </div>
+          <div class="card-body p-4">
+            <form id="form-login" autocomplete="off">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Correo Institucional</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                  <input type="email" id="login-correo" class="form-control" autocomplete="off" placeholder="Ejemplo@correo.com" required>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Contraseña</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                  <input type="password" id="login-password" class="form-control" autocomplete="new-password" placeholder="••••••••" required>
+                </div>
+              </div>
+              <div id="login-alerta" class="alert alert-danger py-2 small d-none"></div>
+              <button type="submit" class="btn btn-morado w-100 py-2 fw-bold text-white">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar al Sistema
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. DEVOTOS -->
+    <section id="vista-devotos" class="seccion-spa d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-morado mb-0"><i class="bi bi-people me-2"></i>Padrón de Devotos Cargadores</h4>
+        <button class="btn btn-morado text-white btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoDevoto">
+          <i class="bi bi-person-plus me-1"></i>Nuevo Devoto
+        </button>
+      </div>
+
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>DPI</th>
+                  <th>Cargador</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Altura Hombro</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-devotos-body">
+                <tr><td colspan="6" class="text-center text-muted py-4">Cargando devotos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. CAJA E INSCRIPCIONES (CON SALIDAS DE EFECTIVO) -->
+    <section id="vista-caja" class="seccion-spa d-none">
+      <h4 class="fw-bold text-morado mb-3"><i class="bi bi-cash-coin me-2"></i>Módulo de Operaciones de Caja</h4>
+      
+      <div class="row g-4 mb-4">
+        <!-- 3.1 Cobro de Turno -->
+        <div class="col-12 col-lg-4">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white fw-bold py-3 text-success">
+              <i class="bi bi-ticket-perforated me-2"></i>Cobro de Turno (Ingreso)
+            </div>
+            <div class="card-body p-3">
+              <form id="form-asignar-turno">
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold">Devoto</label>
+                  <select id="turno-devoto-select" class="form-select form-select-sm" required></select>
+                </div>
+                <div class="row g-2 mb-2">
+                  <div class="col-4">
+                    <label class="form-label small fw-semibold">Turno</label>
+                    <input type="number" id="turno-numero" class="form-control form-control-sm" min="1" max="10" value="1" required>
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label small fw-semibold">Lado</label>
+                    <select id="turno-lado" class="form-select form-select-sm" required>
+                      <option value="DERECHO">DERECHO</option>
+                      <option value="IZQUIERDO">IZQUIERDO</option>
+                    </select>
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label small fw-semibold">Brazo</label>
+                    <input type="number" id="turno-brazo" class="form-control form-control-sm" min="1" max="20" value="1" required>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold">Cuota (Q)</label>
+                  <input type="number" id="turno-monto" class="form-control form-control-sm" value="50.00" step="0.01" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm w-100 fw-bold">
+                  <i class="bi bi-plus-circle me-1"></i>Cobrar Turno
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.2 Ofrendas y Donativos -->
+        <div class="col-12 col-lg-4">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white fw-bold py-3 text-primary">
+              <i class="bi bi-heart me-2"></i>Ofrenda / Donación (Ingreso)
+            </div>
+            <div class="card-body p-3">
+              <form id="form-ofrenda">
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold">Bienhechor / Donante</label>
+                  <input type="text" id="ofrenda-donante" class="form-control form-control-sm" placeholder="Devoto Anónimo">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold">Concepto</label>
+                  <input type="text" id="ofrenda-concepto" class="form-control form-control-sm" placeholder="Donación de veladoras" required>
+                </div>
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label small fw-semibold">Monto (Q)</label>
+                    <input type="number" id="ofrenda-monto" class="form-control form-control-sm" step="0.01" placeholder="100.00" required>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small fw-semibold">Método</label>
+                    <select id="ofrenda-metodo" class="form-select form-select-sm">
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Transferencia">Transferencia</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                  <i class="bi bi-gift me-1"></i>Registrar Ofrenda
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.3 REGISTRO DE SALIDAS DE EFECTIVO (EGRESOS) -->
+        <div class="col-12 col-lg-4">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white fw-bold py-3 text-danger">
+              <i class="bi bi-arrow-up-right-circle me-2"></i>Salida de Efectivo (Egreso)
+            </div>
+            <div class="card-body p-3">
+              <form id="form-egreso">
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold">Proveedor / Beneficiario</label>
+                  <input type="text" id="egreso-proveedor" class="form-control form-control-sm" placeholder="Ej. Cerería La Fe" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold">Concepto del Gasto</label>
+                  <input type="text" id="egreso-concepto" class="form-control form-control-sm" placeholder="Compra de 40 cirios" required>
+                </div>
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label small fw-semibold">Monto (Q)</label>
+                    <input type="number" id="egreso-monto" class="form-control form-control-sm" step="0.01" placeholder="250.00" required>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small fw-semibold">No. Factura/Ref</label>
+                    <input type="text" id="egreso-factura" class="form-control form-control-sm" placeholder="FAC-1234">
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-danger btn-sm w-100 fw-bold">
+                  <i class="bi bi-dash-circle me-1"></i>Liquidar Egreso
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. VISUALIZADOR DEL ANDA -->
+    <section id="vista-anda" class="seccion-spa d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-morado mb-0"><i class="bi bi-grid-3x3 me-2"></i>Visualizador del Anda Procesional</h4>
+        <div class="d-flex align-items-center gap-2">
+          <label class="fw-semibold small">Turno:</label>
+          <select id="select-turno-inspeccionar" class="form-select form-select-sm" style="width: 120px;" onchange="cargarDistribucionAnda()">
+            <option value="1">Turno 1</option>
+            <option value="2">Turno 2</option>
+            <option value="3">Turno 3</option>
+            <option value="4">Turno 4</option>
+            <option value="5">Turno 5</option>
+            <option value="6">Turno 6</option>
+            <option value="7">Turno 7</option>
+            <option value="8">Turno 8</option>
+            <option value="9">Turno 9</option>
+            <option value="10">Turno 10</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm rounded-3 p-4">
+        <div class="text-center mb-3">
+          <span class="badge bg-secondary px-4 py-2 text-uppercase fw-bold">Cabecera del Anda (Frente)</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <h6 class="text-center fw-bold text-primary mb-3">Flanco Izquierdo (20 Brazos)</h6>
+            <div id="contenedor-brazos-izq" class="d-flex flex-column gap-2"></div>
+          </div>
+          <div class="col-6">
+            <h6 class="text-center fw-bold text-primary mb-3">Flanco Derecho (20 Brazos)</h6>
+            <div id="contenedor-brazos-der" class="d-flex flex-column gap-2"></div>
+          </div>
+        </div>
+        <div class="text-center mt-3">
+          <span class="badge bg-secondary px-4 py-2 text-uppercase fw-bold">Cola del Anda (Atrás)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. VISTA: REPORTES CONTABLES DETALLADOS -->
+    <section id="vista-reportes" class="seccion-spa d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-morado mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Reportes Contables y Libro Diario</h4>
+        <button class="btn btn-outline-morado btn-sm" onclick="cargarReportes()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Actualizar Datos
+        </button>
+      </div>
+
+      <!-- Tarjetas de Balance -->
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+          <div class="card border-0 bg-success text-white shadow-sm rounded-3 p-3">
+            <small class="text-white-50 text-uppercase fw-bold">Total Ingresos Acumulados</small>
+            <h3 id="card-ingresos" class="fw-bold mb-0">Q 0.00</h3>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card border-0 bg-danger text-white shadow-sm rounded-3 p-3">
+            <small class="text-white-50 text-uppercase fw-bold">Total Egresos / Salidas</small>
+            <h3 id="card-egresos" class="fw-bold mb-0">Q 0.00</h3>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card border-0 bg-morado text-white shadow-sm rounded-3 p-3">
+            <small class="text-white-50 text-uppercase fw-bold">Saldo Disponible en Caja</small>
+            <h3 id="card-saldo" class="fw-bold mb-0">Q 0.00</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLA DETALLADA DE MOVIMIENTOS -->
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white py-3">
+          <h6 class="fw-bold mb-0 text-morado"><i class="bi bi-list-check me-2"></i>Detalle de Transacciones (Libro Diario de Caja)</h6>
+        </div>
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>No. Recibo</th>
+                  <th>Fecha/Hora</th>
+                  <th>Tipo</th>
+                  <th>Concepto / Descripción</th>
+                  <th>Cajero Responsable</th>
+                  <th>Método</th>
+                  <th class="text-end">Monto</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-movimientos-body">
+                <tr><td colspan="7" class="text-center text-muted py-4">Cargando transacciones...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. GESTIÓN DE USUARIOS Y ROLES (ADMIN) -->
+    <section id="vista-usuarios" class="seccion-spa d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold text-morado mb-0"><i class="bi bi-person-gear me-2"></i>Gestión de Usuarios y Roles</h4>
+        <button class="btn btn-morado text-white btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoUsuario">
+          <i class="bi bi-person-plus-fill me-1"></i>Crear Nuevo Colaborador
+        </button>
+      </div>
+
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre Colaborador</th>
+                  <th>Correo Institucional</th>
+                  <th>Rol Asignado</th>
+                  <th>Estado</th>
+                  <th class="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-usuarios-body">
+                <tr><td colspan="6" class="text-center text-muted py-4">Cargando usuarios...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. AUDITORÍA (ADMIN) -->
+    <section id="vista-auditoria" class="seccion-spa d-none">
+      <h4 class="fw-bold text-morado mb-3"><i class="bi bi-shield-lock me-2"></i>Bitácora de Auditoría del Sistema</h4>
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha/Hora</th>
+                  <th>Módulo</th>
+                  <th>Acción</th>
+                  <th>Detalle</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-auditoria-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: REGISTRAR DEVOTO -->
+  <div class="modal fade" id="modalNuevoDevoto" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content rounded-4 border-0">
+        <div class="modal-header bg-morado text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Nuevo Devoto</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-nuevo-devoto">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Número de DPI (13 dígitos)</label>
+              <input type="text" id="devoto-dpi" class="form-control" maxlength="13" pattern="[0-9]{13}" placeholder="2541890120101" required>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Nombres</label>
+                <input type="text" id="devoto-nombres" class="form-control" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Apellidos</label>
+                <input type="text" id="devoto-apellidos" class="form-control" required>
+              </div>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Teléfono</label>
+                <input type="text" id="devoto-telefono" class="form-control" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Altura Hombro (cm enteros)</label>
+                <input type="number" id="devoto-estatura" class="form-control" min="120" max="210" placeholder="175" required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Correo Electrónico</label>
+              <input type="email" id="devoto-correo" class="form-control" required>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-morado text-white btn-sm fw-bold">Guardar Devoto</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR USUARIO -->
+  <div class="modal fade" id="modalNuevoUsuario" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content rounded-4 border-0">
+        <div class="modal-header bg-morado text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-person-gear me-2"></i>Crear Colaborador</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-nuevo-usuario">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Nombre Completo</label>
+              <input type="text" id="usuario-nombres-input" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Correo Institucional</label>
+              <input type="email" id="usuario-correo-input" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Contraseña Inicial</label>
+              <input type="password" id="usuario-password-input" class="form-control" minlength="6" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Rol Asignado</label>
+              <select id="usuario-rol-select" class="form-select" required>
+                <option value="1">Administrador General</option>
+                <option value="2" selected>Tesorero / Cajero</option>
+                <option value="3">Encargado de Enseres</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-morado text-white btn-sm fw-bold">Registrar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

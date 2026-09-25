@@ -3,10 +3,9 @@ const jwt = require('jsonwebtoken');
 const { getQuery } = require('../config/database');
 
 const AuthController = {
-  // POST /api/auth/login
   async login(req, res) {
     try {
-      const { correo, password } = req.body;
+      let { correo, password } = req.body;
 
       if (!correo || !password) {
         return res.status(400).json({ 
@@ -14,30 +13,32 @@ const AuthController = {
         });
       }
 
-      // Buscar usuario activo con su rol
+      correo = correo.trim().toLowerCase();
+
+      // Buscar usuario activo
       const usuario = await getQuery(`
         SELECT U.ID_Usuario, U.ID_Rol, U.Nombres, U.Correo_Institucional, 
                U.Password_Hash, U.Estado_Activo, R.Nombre_Rol
         FROM Usuario U
         INNER JOIN Rol R ON U.ID_Rol = R.ID_Rol
-        WHERE U.Correo_Institucional = ?
-      `, [correo.trim().toLowerCase()]);
+        WHERE LOWER(TRIM(U.Correo_Institucional)) = ?
+      `, [correo]);
 
+      // Mensaje unificado por seguridad (evita adivinación de correos)
       if (!usuario) {
-        return res.status(401).json({ mensaje: 'Credenciales inválidas' });
+        return res.status(401).json({ mensaje: 'Correo o contraseña incorrecta' });
       }
 
       if (usuario.Estado_Activo !== 1) {
-        return res.status(403).json({ mensaje: 'La cuenta de usuario se encuentra inactiva' });
+        return res.status(403).json({ mensaje: 'La cuenta se encuentra dada de baja o inactiva' });
       }
 
-      // Comparar contraseña con el hash bcrypt
+      // Comparación con bcrypt
       const passwordValida = await bcrypt.compare(password, usuario.Password_Hash);
       if (!passwordValida) {
-        return res.status(401).json({ mensaje: 'Credenciales inválidas' });
+        return res.status(401).json({ mensaje: 'Correo o contraseña incorrecta' });
       }
 
-      // Generar JWT
       const secreto = process.env.JWT_SECRET || 'secreto_hermandad_paz_2026_seguro';
       const expiresIn = process.env.JWT_EXPIRES_IN || '8h';
 
@@ -66,11 +67,10 @@ const AuthController = {
       });
     } catch (error) {
       console.error('Error en autenticación:', error);
-      return res.status(500).json({ mensaje: 'Error interno del servidor en el inicio de sesión' });
+      return res.status(500).json({ mensaje: 'Error interno en el inicio de sesión' });
     }
   },
 
-  // GET /api/auth/perfil (Ruta de verificación de token)
   async obtenerPerfil(req, res) {
     return res.status(200).json({
       mensaje: 'Token verificado correctamente',

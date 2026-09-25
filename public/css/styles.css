@@ -1,0 +1,49 @@
+:root {
+  --color-morado: #4a154b;
+  --color-morado-hover: #370f38;
+}
+
+.bg-morado {
+  background-color: var(--color-morado) !important;
+}
+
+.text-morado {
+  color: var(--color-morado) !important;
+}
+
+.btn-morado {
+  background-color: var(--color-morado);
+  border-color: var(--color-morado);
+}
+
+.btn-morado:hover {
+  background-color: var(--color-morado-hover);
+  border-color: var(--color-morado-hover);
+}
+
+.btn-outline-morado {
+  color: var(--color-morado);
+  border-color: var(--color-morado);
+}
+
+.btn-outline-morado:hover {
+  background-color: var(--color-morado);
+  color: white;
+}
+
+/* Indicadores de brazo en el anda */
+.brazo-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  border: 1px solid #dee2e6;
+  background-color: #ffffff;
+}
+
+.brazo-ocupado {
+  background-color: #e8f4fd;
+  border-color: #b6d4fe;
+}

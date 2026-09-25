@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 
@@ -15,12 +16,18 @@ const finanzasRoutes = require('./routes/finanzasRoutes');
 
 const app = express();
 
-app.use(helmet());
+// Configuración de cabeceras permitiendo recursos externos (Bootstrap CDN e Icons)
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
 app.use(cors());
 app.use(express.json());
 app.use(auditMiddleware);
 
-// Rutas base
+// Servir archivos estáticos del frontend
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Endpoints API
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     estado: 'OK',
@@ -39,8 +46,10 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/finanzas', finanzasRoutes);
 
+// Fallback compatible con Express 5 para Single Page Application (SPA)
+// Si la petición no coincide con la API, entrega el index.html
 app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint no encontrado' });
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 module.exports = app;
