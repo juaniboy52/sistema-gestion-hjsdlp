@@ -1,4 +1,4 @@
-const { runQuery, getQuery } = require('../config/database');
+const { runQuery, getQuery, allQuery } = require('../config/database');
 const crypto = require('crypto');
 
 const FinanzasController = {
@@ -152,6 +152,47 @@ const FinanzasController = {
     } catch (error) {
       console.error('Error al registrar egreso:', error);
       return res.status(500).json({ mensaje: 'Error interno al registrar el egreso contable' });
+    }
+  },
+
+  // GET /api/finanzas/mis-cobros-dia
+  async misCobrosDelDia(req, res) {
+    try {
+      const idUsuarioCajero = req.usuario ? req.usuario.idUsuario : 1;
+      const { fecha } = req.query; // Formato YYYY-MM-DD
+      const filtroFecha = fecha || new Date().toISOString().split('T')[0];
+
+      const cobros = await allQuery(`
+        SELECT 
+          T.ID_Transaccion,
+          T.Numero_Recibo,
+          T.Tipo_Movimiento,
+          T.Concepto_Descripcion,
+          T.Monto_Quetzales,
+          T.Metodo_Pago,
+          T.Fecha_Transaccion,
+          D.Nombres AS Devoto_Nombres,
+          D.Apellidos AS Devoto_Apellidos
+        FROM Transaccion_Financiera T
+        LEFT JOIN Devoto D ON T.ID_Devoto = D.ID_Devoto
+        WHERE T.ID_Usuario_Cajero = ? 
+          AND DATE(T.Fecha_Transaccion) = DATE(?)
+          AND T.Tipo_Movimiento = 'Ingreso'
+        ORDER BY T.Fecha_Transaccion DESC
+      `, [idUsuarioCajero, filtroFecha]);
+
+      const totalDia = cobros.reduce((acc, curr) => acc + (parseFloat(curr.Monto_Quetzales) || 0), 0);
+
+      return res.status(200).json({
+        fecha: filtroFecha,
+        cajero: req.usuario ? req.usuario.nombres : 'Cajero General',
+        totalRecaudado: totalDia.toFixed(2),
+        cantidadTransacciones: cobros.length,
+        cobros
+      });
+    } catch (error) {
+      console.error('Error al obtener cobros del cajero:', error);
+      return res.status(500).json({ mensaje: 'Error al obtener cobros diarios' });
     }
   }
 };

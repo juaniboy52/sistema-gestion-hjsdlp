@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 1. Navegación SPA
 function navegarA(idSeccion) {
+  if (idSeccion === 'vista-corte-diario') {
+    cargarMisCobrosDia();
+  }
   document.querySelectorAll('section').forEach(s => s.classList.add('d-none'));
   const target = document.getElementById(idSeccion);
   if (target) target.classList.remove('d-none');
@@ -445,3 +448,210 @@ async function cargarAuditoria() {
     `;
   });
 }
+
+
+
+
+
+// --- LÓGICA EXCLUSIVA DEL CAJERO (ROL 5) ---
+
+// Función de impresión / PDF de ofrendas
+function generarReciboPDF(recibo) {
+  const ventana = window.open('', '_blank', 'width=600,height=700');
+  const contenido = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Recibo de Ofrenda - ${recibo.numeroRecibo || 'Recibo'}</title>
+      <style>
+        body { font-family: 'Courier New', Courier, monospace; margin: 20px; color: #222; }
+        .ticket { border: 2px dashed #4b164c; padding: 25px; max-width: 440px; margin: auto; border-radius: 8px; }
+        .encabezado { text-align: center; border-bottom: 2px solid #4b164c; padding-bottom: 12px; margin-bottom: 15px; }
+        .encabezado h2 { margin: 0; color: #4b164c; font-size: 19px; text-transform: uppercase; }
+        .encabezado p { margin: 3px 0; font-size: 12px; color: #666; }
+        .detalle { font-size: 13px; line-height: 1.6; }
+        .detalle-fila { display: flex; justify-content: space-between; margin: 4px 0; }
+        .monto-total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 8px; color: #198754; }
+        .firma { margin-top: 35px; text-align: center; font-size: 11px; }
+        .linea-firma { border-top: 1px solid #444; width: 60%; margin: 0 auto 5px auto; }
+        .btn-imprimir { display: block; width: 100%; padding: 10px; margin-top: 20px; background: #4b164c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        @media print { .btn-imprimir { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+        <div class="encabezado">
+          <h2>Hermandad de la Paz</h2>
+          <p>Consagrada Imagen de Jesús Sepultado</p>
+          <p>Cuaresma y Semana Santa 2026</p>
+          <p><strong>RECIBO OFICIAL DE OFRENDA</strong></p>
+        </div>
+        <div class="detalle">
+          <div class="detalle-fila"><span><strong>No. Recibo:</strong></span><span>${recibo.numeroRecibo || 'N/A'}</span></div>
+          <div class="detalle-fila"><span><strong>Fecha:</strong></span><span>${recibo.fecha ? new Date(recibo.fecha).toLocaleString() : new Date().toLocaleString()}</span></div>
+          <div class="detalle-fila"><span><strong>Bienhechor:</strong></span><span>${recibo.donante || 'Devoto Anónimo'}</span></div>
+          <div class="detalle-fila"><span><strong>Concepto:</strong></span><span>${recibo.concepto || 'Ofrenda'}</span></div>
+          <div class="detalle-fila"><span><strong>Método:</strong></span><span>${recibo.metodoPago || 'Efectivo'}</span></div>
+          <div class="monto-total">TOTAL: Q${parseFloat(recibo.montoQuetzales || 0).toFixed(2)}</div>
+        </div>
+        <div class="firma">
+          <div class="linea-firma"></div>
+          <p>Cajero / Comisión de Finanzas</p>
+          <p style="font-size:9px; color:#777;">Dios bendiga su ofrenda</p>
+        </div>
+        <button class="btn-imprimir" onclick="window.print()">Imprimir / Guardar en PDF</button>
+      </div>
+    </body>
+    </html>
+  `;
+  ventana.document.write(contenido);
+  ventana.document.close();
+}
+
+// Cargar cobros del cajero en su pestaña dedicada
+async function cargarMisCobrosDia() {
+  const inputFecha = document.getElementById('filtro-fecha-cajero');
+  if (inputFecha && !inputFecha.value) {
+    inputFecha.value = new Date().toISOString().split('T')[0];
+  }
+  const fecha = inputFecha ? inputFecha.value : '';
+
+  try {
+    const res = await fetchAutenticado('/finanzas/mis-cobros-dia?fecha=' + fecha);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const badgeTotal = document.getElementById('badge-total-cajero');
+    const cantRecibos = document.getElementById('cant-recibos-cajero');
+    const cuerpo = document.getElementById('tabla-mis-cobros-cuerpo');
+
+    if (badgeTotal) badgeTotal.textContent = 'Total Recaudado: Q' + data.totalRecaudado;
+    if (cantRecibos) cantRecibos.textContent = data.cantidadTransacciones + ' transacciones registradas';
+
+    if (!cuerpo) return;
+    if (!data.cobros || data.cobros.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No has registrado cobros en la fecha seleccionada</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = data.cobros.map(c => `
+      <tr>
+        <td class="fw-bold text-morado small">${c.Numero_Recibo}</td>
+        <td class="small text-muted">${new Date(c.Fecha_Transaccion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+        <td class="small">${c.Concepto_Descripcion}</td>
+        <td><span class="badge bg-light text-dark border">${c.Metodo_Pago}</span></td>
+        <td class="text-end fw-bold text-success">Q${parseFloat(c.Monto_Quetzales).toFixed(2)}</td>
+        <td class="text-center">
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Descargar / Imprimir PDF" onclick="generarReciboPDF({
+            numeroRecibo: '${c.Numero_Recibo}',
+            fecha: '${c.Fecha_Transaccion}',
+            donante: 'Devoto / Fiel',
+            concepto: '${(c.Concepto_Descripcion || '').replace(/'/g, '')}',
+            montoQuetzales: ${c.Monto_Quetzales},
+            metodoPago: '${c.Metodo_Pago}'
+          })">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error al cargar cobros:', err);
+  }
+}
+
+// Aplicar permisos visuales para Cajero
+function aplicarPermisosCajero() {
+  // Identificar si es cajero por variable usuarioActual, sessionStorage, localStorage o badge visible
+  let esCajero = false;
+  
+  if (typeof usuarioActual !== 'undefined' && (usuarioActual.idRol === 5 || usuarioActual.ID_Rol === 5 || usuarioActual.rol === 'Cajero')) {
+    esCajero = true;
+  }
+  
+  const sesionStr = sessionStorage.getItem('usuario') || localStorage.getItem('usuario') || localStorage.getItem('sesion_hermandad');
+  if (sesionStr) {
+    try {
+      const u = JSON.parse(sesionStr);
+      if (u.idRol === 5 || u.ID_Rol === 5 || u.rol === 'Cajero' || (u.usuario && (u.usuario.idRol === 5 || u.usuario.ID_Rol === 5))) {
+        esCajero = true;
+      }
+    } catch(e) {}
+  }
+
+  // Comprobar también el texto del badge superior derecho
+  const badges = document.querySelectorAll('.badge');
+  badges.forEach(b => {
+    if (b.textContent.trim().toLowerCase() === 'cajero') {
+      esCajero = true;
+    }
+  });
+
+  if (esCajero) {
+    // 1. Ocultar Visualizador Anda y Reportes Contables del navbar
+    const navAnda = document.getElementById('nav-item-anda');
+    const navReportes = document.getElementById('nav-item-reportes');
+    const navUsuarios = document.getElementById('nav-item-usuarios');
+    const navAuditoria = document.getElementById('nav-item-auditoria');
+    if (navAnda) navAnda.style.setProperty('display', 'none', 'important');
+    if (navReportes) navReportes.style.setProperty('display', 'none', 'important');
+    if (navUsuarios) navUsuarios.style.setProperty('display', 'none', 'important');
+    if (navAuditoria) navAuditoria.style.setProperty('display', 'none', 'important');
+
+    // 2. Mostrar la pestaña "Mi Corte Diario"
+    const navCorte = document.getElementById('nav-item-corte');
+    if (navCorte) {
+      navCorte.classList.remove('d-none');
+      navCorte.style.removeProperty('display');
+    }
+
+    // 3. Ocultar la tarjeta de Salida de Efectivo (Egreso)
+    const formEgreso = document.getElementById('form-egreso');
+    if (formEgreso) {
+      const colEgreso = formEgreso.closest('.col-12, .col-lg-4');
+      if (colEgreso) colEgreso.style.setProperty('display', 'none', 'important');
+    }
+  }
+}
+
+// Vincular al envío de ofrendas para emitir PDF automático
+if (typeof manejarOfrenda === 'function') {
+  manejarOfrenda = async function(e) {
+    e.preventDefault();
+    const nombreBienhechor = document.getElementById('ofrenda-donante')?.value || 'Devoto Anónimo';
+    const conceptoDescripcion = document.getElementById('ofrenda-concepto')?.value;
+    const montoQuetzales = parseFloat(document.getElementById('ofrenda-monto')?.value);
+    const metodoPago = document.getElementById('ofrenda-metodo')?.value || 'Efectivo';
+
+    try {
+      const res = await fetchAutenticado('/finanzas/ofrenda', {
+        method: 'POST',
+        body: JSON.stringify({ nombreBienhechor, conceptoDescripcion, montoQuetzales, metodoPago })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.mensaje || 'Error al registrar ofrenda');
+        return;
+      }
+      alert(data.mensaje);
+      document.getElementById('form-ofrenda')?.reset();
+
+      if (data.comprobante) {
+        generarReciboPDF(data.comprobante);
+      }
+      cargarMisCobrosDia();
+    } catch (err) {
+      alert('Error de conexión al registrar la ofrenda');
+    }
+  };
+}
+
+// Ejecutar revisión continua al cargar y en intervalos cortos para asegurar el DOM
+window.addEventListener('DOMContentLoaded', () => {
+  aplicarPermisosCajero();
+  setTimeout(aplicarPermisosCajero, 200);
+  setTimeout(aplicarPermisosCajero, 600);
+  setTimeout(aplicarPermisosCajero, 1200);
+});
+setInterval(aplicarPermisosCajero, 1000);

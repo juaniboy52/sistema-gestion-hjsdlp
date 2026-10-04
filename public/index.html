@@ -27,8 +27,11 @@
           <li class="nav-item">
             <a class="nav-link" href="#" onclick="navegarA('vista-caja')"><i class="bi bi-cash-coin me-1"></i>Caja e Inscripciones</a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" id="nav-item-anda">
             <a class="nav-link" href="#" onclick="navegarA('vista-anda')"><i class="bi bi-grid-3x3 me-1"></i>Visualizador Anda</a>
+          </li>
+          <li class="nav-item d-none" id="nav-item-corte">
+            <a class="nav-link" href="#" onclick="navegarA('vista-corte-diario')"><i class="bi bi-calendar-check me-1"></i>Mi Corte Diario</a>
           </li>
           <li class="nav-item" id="nav-item-reportes">
             <a class="nav-link" href="#" onclick="navegarA('vista-reportes')"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Reportes Contables</a>
@@ -243,9 +246,50 @@
           </div>
         </div>
       </div>
+    
+        
+
     </section>
 
     <!-- 4. VISUALIZADOR DEL ANDA -->
+    
+    <!-- SECCIÓN INDEPENDIENTE: CORTE DIARIO DEL CAJERO -->
+    <section id="vista-corte-diario" class="seccion-spa d-none">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white fw-bold py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span class="fs-5 text-morado"><i class="bi bi-calendar-check me-2"></i>Mi Registro de Cobros (Corte Diario)</span>
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-semibold mb-0">Fecha:</label>
+            <input type="date" id="filtro-fecha-cajero" class="form-control form-control-sm" style="width: 170px;" onchange="cargarMisCobrosDia()">
+            <button class="btn btn-sm btn-outline-morado" onclick="cargarMisCobrosDia()"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</button>
+          </div>
+        </div>
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge bg-success fs-6 px-3 py-2" id="badge-total-cajero">Total Recaudado: Q0.00</span>
+            <span class="text-muted small" id="cant-recibos-cajero">0 transacciones registradas</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr class="small text-muted">
+                  <th>No. Recibo</th>
+                  <th>Hora</th>
+                  <th>Concepto / Detalle</th>
+                  <th>Método</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-center">Comprobante</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-mis-cobros-cuerpo">
+                <tr><td colspan="6" class="text-center text-muted py-4">Cargando cobros del día...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="vista-anda" class="seccion-spa d-none">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold text-morado mb-0"><i class="bi bi-grid-3x3 me-2"></i>Visualizador del Anda Procesional</h4>
@@ -476,8 +520,10 @@
               <label class="form-label small fw-semibold">Rol Asignado</label>
               <select id="usuario-rol-select" class="form-select" required>
                 <option value="1">Administrador General</option>
-                <option value="2" selected>Tesorero / Cajero</option>
-                <option value="3">Encargado de Enseres</option>
+                <option value="2">Secretaría / Inscripciones</option>
+                <option value="3">Tesorero General</option>
+                <option value="4">Encargado de Enseres</option>
+                <option value="5" selected>Cajero (Solo Cobros)</option>
               </select>
             </div>
           </div>
