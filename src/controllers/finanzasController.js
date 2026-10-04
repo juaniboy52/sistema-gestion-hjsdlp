@@ -75,6 +75,7 @@ const FinanzasController = {
         proveedorBeneficiario,
         conceptoGasto,
         montoQuetzales,
+        encargadoGasto = 'Comisión de Finanzas',
         categoriaGasto = 'Operativo Procesional',
         metodoPago = 'Efectivo',
         numeroFacturaComprobante = 'S/F',
@@ -83,7 +84,6 @@ const FinanzasController = {
 
       const idUsuarioCajero = req.usuario ? req.usuario.idUsuario : 1;
 
-      // 1. Validaciones requeridas
       if (!proveedorBeneficiario || !conceptoGasto || !montoQuetzales) {
         return res.status(400).json({
           mensaje: 'El proveedor/beneficiario, el concepto del gasto y el monto son obligatorios'
@@ -95,7 +95,6 @@ const FinanzasController = {
         return res.status(400).json({ mensaje: 'El monto del egreso debe ser un número mayor a 0' });
       }
 
-      // 2. Control contable: Verificar que haya liquidez en caja antes de autorizar el desembolso
       const balanceActual = await getQuery(`
         SELECT 
           (COALESCE(SUM(CASE WHEN Tipo_Movimiento = 'Ingreso' THEN Monto_Quetzales ELSE 0 END), 0) -
@@ -109,12 +108,10 @@ const FinanzasController = {
         });
       }
 
-      // 3. Generar identificadores de comprobante
       const timestamp = Date.now().toString().slice(-6) + Math.floor(Math.random() * 10);
       const numeroComprobante = `EGR-${anioCuaresma}-${timestamp}`;
       const codigoValidacion = crypto.randomBytes(16).toString('hex').toUpperCase();
 
-      // 4. Inserción del egreso
       await runQuery(`
         INSERT INTO Transaccion_Financiera (
           Numero_Recibo,
@@ -124,15 +121,17 @@ const FinanzasController = {
           Concepto_Descripcion,
           Monto_Quetzales,
           Metodo_Pago,
-          Codigo_Validacion_Recibo
-        ) VALUES (?, ?, NULL, 'Egreso', ?, ?, ?, ?)
+          Codigo_Validacion_Recibo,
+          Encargado_Gasto
+        ) VALUES (?, ?, NULL, 'Egreso', ?, ?, ?, ?, ?)
       `, [
         numeroComprobante,
         idUsuarioCajero,
-        `[EGRESO / ${categoriaGasto}] Pagado a: ${proveedorBeneficiario} | Ref: ${numeroFacturaComprobante} | Detalle: ${conceptoGasto}`,
+        `[EGRESO / ${categoriaGasto}] Pagado a: ${proveedorBeneficiario} | Encargado: ${encargadoGasto} | Ref: ${numeroFacturaComprobante} | Detalle: ${conceptoGasto}`,
         monto,
         metodoPago,
-        codigoValidacion
+        codigoValidacion,
+        encargadoGasto
       ]);
 
       return res.status(201).json({
@@ -141,6 +140,7 @@ const FinanzasController = {
           numeroComprobante,
           codigoValidacion,
           beneficiario: proveedorBeneficiario,
+          encargadoGasto,
           concepto: conceptoGasto,
           categoria: categoriaGasto,
           montoDesembolsado: `Q${monto.toFixed(2)}`,

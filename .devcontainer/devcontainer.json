@@ -1,5 +1,5 @@
 {
-  "name": "Hermandad Node Environment",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  "name": "Sistema Gestion HJSDLP",
+  "postCreateCommand": "npm install && npm run init-db",
   "forwardPorts": [3000]
 }

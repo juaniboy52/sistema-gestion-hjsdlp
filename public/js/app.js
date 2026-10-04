@@ -237,6 +237,7 @@ async function manejarOfrenda(e) {
 async function manejarEgreso(e) {
   e.preventDefault();
   const proveedorBeneficiario = document.getElementById('egreso-proveedor').value;
+  const encargadoGasto = document.getElementById('egreso-encargado').value;
   const conceptoGasto = document.getElementById('egreso-concepto').value;
   const montoQuetzales = parseFloat(document.getElementById('egreso-monto').value);
   const numeroFacturaComprobante = document.getElementById('egreso-factura').value || 'S/F';
@@ -244,7 +245,8 @@ async function manejarEgreso(e) {
   const res = await fetchAutenticado('/finanzas/egreso', {
     method: 'POST',
     body: JSON.stringify({ 
-      proveedorBeneficiario, 
+      proveedorBeneficiario,
+      encargadoGasto,
       conceptoGasto, 
       montoQuetzales, 
       numeroFacturaComprobante 
