@@ -8,41 +8,62 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tokenActual) {
     iniciarSesionEnFrontend(tokenActual, usuarioActual);
   } else {
-    navegarA('vista-login');
+    navegarA('vista-bienvenida');
   }
 
   // Formularios
   document.getElementById('form-login').addEventListener('submit', manejarLogin);
   document.getElementById('form-nuevo-devoto').addEventListener('submit', manejarRegistroDevoto);
-  document.getElementById('form-asignar-turno').addEventListener('submit', manejarAsignarTurno);
+  const formAsignar = document.getElementById('form-asignar-turno') || document.getElementById('form-cobro-turno');
+  if (formAsignar && typeof manejarCobroTurno === 'function') formAsignar.addEventListener('submit', manejarCobroTurno);
+  else if (formAsignar && typeof manejarAsignarTurno === 'function') formAsignar.addEventListener('submit', manejarAsignarTurno);
   document.getElementById('form-ofrenda').addEventListener('submit', manejarOfrenda);
   document.getElementById('form-egreso').addEventListener('submit', manejarEgreso);
   document.getElementById('form-nuevo-usuario').addEventListener('submit', manejarCrearUsuario);
 });
 
 // 1. Navegación SPA
-function navegarA(idSeccion) {
-  if (idSeccion === 'vista-corte-diario') {
-    cargarMisCobrosDia();
-  }
-  document.querySelectorAll('section').forEach(s => s.classList.add('d-none'));
-  const target = document.getElementById(idSeccion);
-  if (target) target.classList.remove('d-none');
 
-  if (idSeccion === 'vista-devotos') cargarDevotos();
-  if (idSeccion === 'vista-caja') cargarSelectDevotos();
-  if (idSeccion === 'vista-anda') cargarDistribucionAnda();
-  if (idSeccion === 'vista-reportes') cargarReportes();
-  if (idSeccion === 'vista-usuarios') cargarUsuarios();
-  if (idSeccion === 'vista-auditoria') cargarAuditoria();
+function navegarA(vistaId) {
+  // 1. Ocultar todas las secciones SPA
+  document.querySelectorAll('.seccion-spa, section').forEach(s => s.classList.add('d-none'));
+
+  // 2. Mostrar la sección seleccionada
+  const destino = document.getElementById(vistaId);
+  if (destino) {
+    destino.classList.remove('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // 3. Resaltar enlace activo en navbar
+  document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+    link.classList.remove('active');
+  });
+  const linkActivo = document.querySelector(`[onclick="navegarA('${vistaId}')"]`);
+  if (linkActivo) linkActivo.classList.add('active');
+
+  // 4. Cargar datos correspondientes
+  if (vistaId === 'vista-devotos' && typeof cargarDevotos === 'function') cargarDevotos();
+  if (vistaId === 'vista-caja' && typeof cargarSelectDevotos === 'function') cargarSelectDevotos();
+  if (vistaId === 'vista-corte-diario' && typeof cargarMisCobrosDia === 'function') cargarMisCobrosDia();
+  if (vistaId === 'vista-anda' && typeof cargarDistribucionAnda === 'function') cargarDistribucionAnda();
+  if (vistaId === 'vista-reportes') {
+    if (typeof cargarReporteFinanciero === 'function') cargarReporteFinanciero();
+    else if (typeof cargarReportes === 'function') cargarReportes();
+  }
+  if (vistaId === 'vista-usuarios' && typeof cargarUsuarios === 'function') cargarUsuarios();
+  if (vistaId === 'vista-auditoria' && typeof cargarAuditoria === 'function') cargarAuditoria();
 }
 
 // 2. Autenticación y Cierre de Sesión
 async function manejarLogin(e) {
   e.preventDefault();
-  const correo = document.getElementById('login-correo').value;
-  const password = document.getElementById('login-password').value;
+  const correoEl = document.getElementById('login-correo');
+  const passEl = document.getElementById('login-password');
   const alerta = document.getElementById('login-alerta');
+
+  const correo = correoEl ? correoEl.value.trim() : '';
+  const password = passEl ? passEl.value : '';
 
   try {
     const res = await fetch(`${API_URL}/auth/login`, {
@@ -53,55 +74,77 @@ async function manejarLogin(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      alerta.textContent = data.mensaje || 'Correo o contraseña incorrecta';
-      alerta.classList.remove('d-none');
+      if (alerta) {
+        alerta.textContent = data.mensaje || 'Credenciales incorrectas';
+        alerta.classList.remove('d-none');
+      } else {
+        alert(data.mensaje || 'Credenciales incorrectas');
+      }
       return;
     }
 
     tokenActual = data.token;
     usuarioActual = data.usuario;
 
-    // Guardar en sessionStorage (se borra al cerrar las pestañas)
     sessionStorage.setItem('token_hermandad', tokenActual);
     sessionStorage.setItem('usuario_hermandad', JSON.stringify(usuarioActual));
+    sessionStorage.setItem('usuario', JSON.stringify(usuarioActual));
+    localStorage.setItem('usuario', JSON.stringify(usuarioActual));
 
-    // Limpiar campos del login para no dejarlos en memoria DOM
-    document.getElementById('login-correo').value = '';
-    document.getElementById('login-password').value = '';
-    alerta.classList.add('d-none');
+    if (correoEl) correoEl.value = '';
+    if (passEl) passEl.value = '';
+    if (alerta) alerta.classList.add('d-none');
 
     iniciarSesionEnFrontend(tokenActual, usuarioActual);
   } catch (error) {
-    alerta.textContent = 'Error de conexión con el servidor';
-    alerta.classList.remove('d-none');
+    console.error('Error durante el login:', error);
+    if (alerta) {
+      alerta.textContent = 'Error de conexión con el servidor';
+      alerta.classList.remove('d-none');
+    } else {
+      alert('Error de conexión con el servidor');
+    }
   }
 }
 
 function iniciarSesionEnFrontend(token, usuario) {
-  document.getElementById('navbar-principal').classList.remove('d-none');
-  document.getElementById('usuario-nombre').textContent = usuario.nombres || 'Usuario';
-  document.getElementById('usuario-rol').textContent = usuario.rol || 'Colaborador';
+  sessionStorage.setItem("usuario", JSON.stringify(usuario));
+  sessionStorage.setItem("usuario_hermandad", JSON.stringify(usuario));
+  
 
-  const esAdmin = usuario.idRol === 1;
-  const navUsuarios = document.getElementById('nav-item-usuarios');
-  const navAuditoria = document.getElementById('nav-item-auditoria');
+  const modalEl = document.getElementById("modalLogin");
+  if (modalEl && typeof bootstrap !== "undefined") {
+    const modalInstancia = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modalInstancia.hide();
+  }
 
-  if (navUsuarios) navUsuarios.classList.toggle('d-none', !esAdmin);
-  if (navAuditoria) navAuditoria.classList.toggle('d-none', !esAdmin);
+  document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
+  document.body.classList.remove("modal-open");
+  document.body.style.removeProperty("padding-right");
 
-  navegarA('vista-devotos');
+  if (typeof actualizarNavPorSesion === "function") {
+    actualizarNavPorSesion();
+  }
+
+  const idRol = Number(usuario.idRol || usuario.ID_Rol || 0);
+  navegarA("vista-bienvenida");
 }
 
 function cerrarSesion() {
-  // Limpiar almacenamiento de sesión y local
   sessionStorage.clear();
   localStorage.clear();
   tokenActual = null;
   usuarioActual = {};
 
-  // Limpiar campos del formulario
-  const formLogin = document.getElementById('form-login');
+  const formLogin = document.getElementById("form-login");
   if (formLogin) formLogin.reset();
+
+  if (typeof actualizarNavPorSesion === "function") {
+    actualizarNavPorSesion();
+  } else {
+    location.reload();
+  }
+  navegarA("vista-bienvenida");
   const inputCorreo = document.getElementById('login-correo');
   if (inputCorreo) inputCorreo.value = '';
   const inputPass = document.getElementById('login-password');
@@ -114,7 +157,7 @@ function cerrarSesion() {
   }
 
   document.getElementById('navbar-principal').classList.add('d-none');
-  navegarA('vista-login');
+  navegarA('vista-bienvenida');
 }
 
 async function fetchAutenticado(endpoint, opciones = {}) {
@@ -184,7 +227,8 @@ async function manejarRegistroDevoto(e) {
 
 // 4. Operaciones de Caja
 async function cargarSelectDevotos() {
-  const select = document.getElementById('turno-devoto-select');
+  const select = document.getElementById('cobro-devoto-select') || document.getElementById('devoto-select');
+  if (!select) return;
   const res = await fetch(`${API_URL}/devotos`);
   const data = await res.json();
   select.innerHTML = '<option value="">Seleccione un cargador...</option>';
@@ -648,10 +692,135 @@ if (typeof manejarOfrenda === 'function') {
 }
 
 // Ejecutar revisión continua al cargar y en intervalos cortos para asegurar el DOM
+
 window.addEventListener('DOMContentLoaded', () => {
-  aplicarPermisosCajero();
-  setTimeout(aplicarPermisosCajero, 200);
-  setTimeout(aplicarPermisosCajero, 600);
-  setTimeout(aplicarPermisosCajero, 1200);
+  const token = sessionStorage.getItem('token_hermandad');
+  const usuarioGuardado = sessionStorage.getItem('usuario_hermandad') || sessionStorage.getItem('usuario');
+
+  if (token && usuarioGuardado) {
+    try {
+      tokenActual = token;
+      usuarioActual = JSON.parse(usuarioGuardado);
+      actualizarNavPorSesion();
+      const idRol = Number(usuarioActual.idRol || usuarioActual.ID_Rol || 0);
+      navegarA("vista-bienvenida");
+    } catch (e) {
+      sessionStorage.clear();
+      actualizarNavPorSesion();
+      navegarA('vista-bienvenida');
+    }
+  } else {
+    sessionStorage.clear();
+    actualizarNavPorSesion();
+    navegarA('vista-bienvenida');
+  }
+
+  // Formularios con verificación de existencia
+  document.getElementById('form-login')?.addEventListener('submit', manejarLogin);
+  document.getElementById('form-nuevo-devoto')?.addEventListener('submit', manejarRegistroDevoto);
+  document.getElementById('form-cobro-turno')?.addEventListener('submit', (e) => {
+    if (typeof manejarCobroTurno === 'function') manejarCobroTurno(e);
+    else if (typeof manejarAsignarTurno === 'function') manejarAsignarTurno(e);
+  });
+  document.getElementById('form-ofrenda')?.addEventListener('submit', manejarOfrenda);
+  document.getElementById('form-egreso')?.addEventListener('submit', manejarEgreso);
+  document.getElementById('form-nuevo-usuario')?.addEventListener('submit', manejarCrearUsuario);
 });
-setInterval(aplicarPermisosCajero, 1000);
+
+// setInterval removido
+
+
+
+function actualizarNavPorSesion() {
+  const sesionStr = sessionStorage.getItem("usuario_hermandad") || sessionStorage.getItem("usuario");
+  
+  let sesion = null;
+  if (sesionStr) {
+    try { sesion = JSON.parse(sesionStr); } catch (e) { sesion = null; }
+  }
+
+  if (!sesion && typeof usuarioActual !== 'undefined' && usuarioActual && (usuarioActual.idRol || usuarioActual.ID_Rol)) {
+    sesion = usuarioActual;
+  }
+
+  const btnLogin = document.getElementById('btn-abrir-login');
+  const btnSalir = document.getElementById('btn-cerrar-sesion');
+  const infoSesion = document.getElementById('info-sesion');
+  const nombreTxt = document.getElementById('nombre-usuario-sesion');
+  const badgeRol = document.getElementById('badge-rol-sesion');
+
+  if (sesion) {
+    const rolId = Number(sesion.idRol || sesion.ID_Rol || (sesion.usuario ? (sesion.usuario.idRol || sesion.usuario.ID_Rol) : 0));
+    const nombre = sesion.nombres || (sesion.usuario ? sesion.usuario.nombres : 'Administrador');
+    let rolNombre = sesion.nombreRol || (sesion.usuario ? sesion.usuario.nombreRol : '');
+
+    if (!rolNombre) {
+      if (rolId === 1) rolNombre = 'Administrador General';
+      else if (rolId === 2) rolNombre = 'Secretaría';
+      else if (rolId === 3) rolNombre = 'Tesorero';
+      else if (rolId === 4) rolNombre = 'Enseres';
+      else if (rolId === 5) rolNombre = 'Cajero';
+      else rolNombre = 'Colaborador';
+    }
+
+    if (btnLogin) btnLogin.classList.add('d-none');
+    if (btnSalir) btnSalir.classList.remove('d-none');
+    if (infoSesion) infoSesion.classList.remove('d-none');
+    if (nombreTxt) nombreTxt.textContent = nombre;
+    if (badgeRol) badgeRol.textContent = rolNombre;
+
+    // Accesos globales
+    document.getElementById('nav-item-devotos')?.classList.remove('d-none');
+    document.getElementById('nav-item-caja')?.classList.remove('d-none');
+
+    if (rolId === 1) {
+      // ADMINISTRADOR: Acceso TOTAL a todos los módulos
+      document.getElementById('nav-item-anda')?.classList.remove('d-none');
+      document.getElementById('nav-item-reportes')?.classList.remove('d-none');
+      document.getElementById('nav-item-usuarios')?.classList.remove('d-none');
+      document.getElementById('nav-item-auditoria')?.classList.remove('d-none');
+      document.getElementById('columna-egreso')?.classList.remove('d-none');
+      
+      // Ocultar pestaña individual de corte diario (exclusiva del cajero de ventanilla)
+      document.getElementById('nav-item-corte')?.classList.add('d-none');
+
+      // Limpiar propiedades display: none forzadas por style inline
+      ['nav-item-anda', 'nav-item-reportes', 'nav-item-usuarios', 'nav-item-auditoria', 'columna-egreso'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.removeProperty('display');
+      });
+    } else if (rolId === 5) {
+      // CAJERO: Solo cobros, corte diario e inscripciones
+      document.getElementById('nav-item-corte')?.classList.remove('d-none');
+      document.getElementById('nav-item-anda')?.classList.add('d-none');
+      document.getElementById('nav-item-reportes')?.classList.add('d-none');
+      document.getElementById('nav-item-usuarios')?.classList.add('d-none');
+      document.getElementById('nav-item-auditoria')?.classList.add('d-none');
+      document.getElementById('columna-egreso')?.classList.add('d-none');
+    } else {
+      // Otros roles (Secretaría / Tesorería)
+      document.getElementById('nav-item-anda')?.classList.remove('d-none');
+      document.getElementById('nav-item-reportes')?.classList.remove('d-none');
+      document.getElementById('nav-item-usuarios')?.classList.add('d-none');
+      document.getElementById('nav-item-auditoria')?.classList.add('d-none');
+      document.getElementById('nav-item-corte')?.classList.add('d-none');
+      if (rolId === 3) {
+        document.getElementById('columna-egreso')?.classList.remove('d-none');
+      }
+    }
+  } else {
+    // Sesión cerrada
+    if (btnLogin) btnLogin.classList.remove('d-none');
+    if (btnSalir) btnSalir.classList.add('d-none');
+    if (infoSesion) infoSesion.classList.add('d-none');
+
+    ['nav-item-devotos','nav-item-caja','nav-item-corte','nav-item-anda','nav-item-reportes','nav-item-usuarios','nav-item-auditoria'].forEach(id => {
+      document.getElementById(id)?.classList.add('d-none');
+    });
+  }
+}
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  actualizarNavPorSesion();
+});
