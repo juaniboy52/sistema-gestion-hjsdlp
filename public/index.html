@@ -468,15 +468,58 @@
 
     <!-- 6. REPORTES CONTABLES -->
     <section id="vista-reportes" class="seccion-spa d-none">
-      <div class="card card-custom">
-        <div class="card-header-morado">
-          <h5 class="mb-0 font-cinzel"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Reportes Contables y Balance General</h5>
+  <div class="card card-custom mb-4 shadow-sm">
+    <div class="card-header-morado d-flex justify-content-between align-items-center">
+      <h5 class="mb-0 font-cinzel text-warning"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Reportes Contables y Balance General</h5>
+      <button class="btn btn-sm btn-outline-light" onclick="cargarReportes()"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</button>
+    </div>
+    <div class="card-body p-4">
+      <!-- Tarjetas de Balance -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-success bg-opacity-10 border-start border-4 border-success p-3">
+            <div class="text-muted small fw-bold">TOTAL INGRESOS</div>
+            <div class="fs-4 fw-bold text-success" id="card-ingresos">Q 0.00</div>
+          </div>
         </div>
-        <div class="card-body p-4" id="contenedor-reporte-financiero">
-          <p class="text-muted">Cargando estado financiero...</p>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-danger bg-opacity-10 border-start border-4 border-danger p-3">
+            <div class="text-muted small fw-bold">TOTAL EGRESOS</div>
+            <div class="fs-4 fw-bold text-danger" id="card-egresos">Q 0.00</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-primary bg-opacity-10 border-start border-4 border-primary p-3">
+            <div class="text-muted small fw-bold">BALANCE NETO / DISPONIBLE</div>
+            <div class="fs-4 fw-bold text-primary" id="card-saldo">Q 0.00</div>
+          </div>
         </div>
       </div>
-    </section>
+
+      <!-- Tabla de Movimientos Financieros -->
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>No. Recibo</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Concepto / Descripción</th>
+              <th>Responsable</th>
+              <th>Método</th>
+              <th class="text-end">Monto</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-movimientos-body">
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">Cargando movimientos...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
 
     <!-- 7. GESTIÓN DE USUARIOS Y ROLES -->
     <section id="vista-usuarios" class="seccion-spa d-none">
