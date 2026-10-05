@@ -134,6 +134,10 @@
           <li class="nav-item d-none" id="nav-item-reportes">
             <a class="nav-link" href="#" onclick="navegarA('vista-reportes')"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Reportes Contables</a>
           </li>
+          <!-- Inventario de Enseres (Admin) -->
+          <li class="nav-item d-none" id="nav-item-enseres">
+            <a class="nav-link" href="#" onclick="navegarA('vista-enseres')"><i class="bi bi-box-seam me-1"></i>Inventario de Enseres</a>
+          </li>
           <li class="nav-item d-none" id="nav-item-usuarios">
             <a class="nav-link" href="#" onclick="navegarA('vista-usuarios')"><i class="bi bi-person-gear me-1"></i>Usuarios y Roles</a>
           </li>
@@ -522,6 +526,55 @@
 </section>
 
     <!-- 7. GESTIÓN DE USUARIOS Y ROLES -->
+    
+    <!-- SECCIÓN: INVENTARIO DE ENSERES -->
+    <section id="vista-enseres" class="seccion-spa d-none">
+      <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+          <h3 class="font-cinzel text-morado fw-bold mb-0"><i class="bi bi-box-seam me-2"></i>Inventario de Enseres y Bienes</h3>
+          <p class="text-muted small mb-0">Control de inventario, stock y movimientos de Kardex de la Hermandad</p>
+        </div>
+        <button class="btn btn-morado text-white" onclick="abrirNuevoEnser()">
+          <i class="bi bi-plus-circle me-1"></i>Nuevo Artículo
+        </button>
+      </div>
+
+      <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3 align-items-center mb-3">
+            <div class="col-md-6">
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="buscar-enser" class="form-control border-start-0" placeholder="Buscar por nombre o descripción...">
+              </div>
+            </div>
+            <div class="col-md-6 text-end">
+              <span class="badge bg-secondary p-2" id="total-enseres-badge">0 artículos registrados</span>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 70px;">ID</th>
+                  <th>Artículo</th>
+                  <th>Descripción</th>
+                  <th class="text-center" style="width: 130px;">Existencias</th>
+                  <th class="text-end" style="width: 220px;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-enseres-body">
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">Cargando inventario...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="vista-usuarios" class="seccion-spa d-none">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="font-cinzel text-morado fw-bold mb-0"><i class="bi bi-person-gear me-2"></i>Gestión de Usuarios y Roles</h4>
@@ -824,6 +877,126 @@
             <button type="submit" class="btn btn-dorado btn-sm"><i class="bi bi-shield-lock me-1"></i>Guardar</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: NUEVO ARTÍCULO ENSER -->
+  <div class="modal fade" id="modalNuevoEnser" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content rounded-4 border-0">
+        <div class="p-3 text-white" style="background:#2C0B30;">
+          <h5 class="modal-title font-cinzel fw-bold"><i class="bi bi-box me-2"></i>Registrar Nuevo Enser</h5>
+        </div>
+        <form id="form-nuevo-enser">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Nombre del Artículo *</label>
+              <input type="text" id="enser-nombre" class="form-control" placeholder="Ej. Túnica Morada Talla M, Farol Procesional" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Descripción / Detalles</label>
+              <textarea id="enser-descripcion" class="form-control" rows="3" placeholder="Detalles de conservación, material o ubicación de resguardo..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn text-white" style="background:#4A154B;">Registrar Artículo</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MOVIMIENTO DE KARDEX -->
+  <div class="modal fade" id="modalMovimientoKardex" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content rounded-4 border-0">
+        <div class="p-3 text-white" id="header-modal-kardex" style="background:#1B2A4A;">
+          <h5 class="modal-title fw-bold"><i class="bi bi-arrow-left-right me-2"></i>Movimiento de Kardex</h5>
+        </div>
+        <form id="form-movimiento-kardex">
+          <input type="hidden" id="kardex-enser-id">
+          <div class="modal-body p-4">
+            <div class="alert alert-light border mb-3">
+              <span class="small text-muted d-block">Artículo seleccionado:</span>
+              <strong id="kardex-enser-nombre" class="fs-6 text-dark">-</strong>
+              <div class="small text-muted mt-1">Stock actual: <span id="kardex-stock-actual" class="badge bg-secondary">0</span></div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Tipo de Operación *</label>
+              <select id="kardex-tipo" class="form-select fw-bold" required>
+                <option value="ENTRADA">🟢 ENTRADA (Donación, Compra, Retorno)</option>
+                <option value="SALIDA">🔴 SALIDA (Préstamo, Merma, Uso Procesional)</option>
+              </select>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Cantidad de Unidades *</label>
+                <input type="number" id="kardex-cantidad" class="form-control fw-bold" min="1" step="1" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Estado de Conservación</label>
+                <select id="kardex-conservacion" class="form-select">
+                  <option value="Excelente">Excelente</option>
+                  <option value="Bueno" selected>Bueno</option>
+                  <option value="Regular">Regular</option>
+                  <option value="Deteriorado">Deteriorado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="btn-guardar-kardex">Procesar Movimiento</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: HISTORIAL DE KARDEX -->
+  <div class="modal fade" id="modalHistorialKardex" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content rounded-4 border-0">
+        <div class="p-3 text-white bg-dark">
+          <h5 class="modal-title font-cinzel fw-bold"><i class="bi bi-clock-history me-2"></i>Historial Kardex del Artículo</h5>
+        </div>
+        <div class="modal-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 id="historial-articulo-nombre" class="fw-bold mb-0 text-morado">-</h5>
+              <span class="small text-muted">Registro auditado de entradas y salidas</span>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-secondary p-2">Existencias Actuales: <strong id="historial-stock-badge">0</strong></span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Operación</th>
+                  <th class="text-center">Cantidad</th>
+                  <th>Estado</th>
+                  <th>Responsable</th>
+                </tr>
+              </thead>
+              <tbody id="historial-kardex-body">
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">Cargando bitácora...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
       </div>
     </div>
   </div>

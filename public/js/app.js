@@ -780,11 +780,16 @@ function actualizarNavPorSesion() {
     document.getElementById('nav-item-devotos')?.classList.remove('d-none');
     document.getElementById('nav-item-caja')?.classList.remove('d-none');
 
+    
+    const esAdminOEnseres = (rolId === 1 || rolId === 4);
+    document.getElementById('nav-item-enseres')?.classList.toggle('d-none', !esAdminOEnseres);
+
     if (rolId === 1) {
       // ADMINISTRADOR: Acceso TOTAL a todos los módulos
       document.getElementById('nav-item-anda')?.classList.remove('d-none');
       document.getElementById('nav-item-reportes')?.classList.remove('d-none');
       document.getElementById('nav-item-usuarios')?.classList.remove('d-none');
+      
       document.getElementById('nav-item-auditoria')?.classList.remove('d-none');
       document.getElementById('columna-egreso')?.classList.remove('d-none');
       
@@ -792,16 +797,28 @@ function actualizarNavPorSesion() {
       document.getElementById('nav-item-corte')?.classList.add('d-none');
 
       // Limpiar propiedades display: none forzadas por style inline
-      ['nav-item-anda', 'nav-item-reportes', 'nav-item-usuarios', 'nav-item-auditoria', 'columna-egreso'].forEach(id => {
+      ['nav-item-anda', 'nav-item-reportes', 'nav-item-enseres', 'nav-item-usuarios', 'nav-item-auditoria', 'columna-egreso'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.removeProperty('display');
       });
+    } else if (rolId === 4) {
+      // ENCARGADO DE ENSERES: Acceso exclusivo a inventario y Kardex
+      document.getElementById('nav-item-anda')?.classList.add('d-none');
+      document.getElementById('nav-item-reportes')?.classList.add('d-none');
+      document.getElementById('nav-item-usuarios')?.classList.add('d-none');
+      document.getElementById('nav-item-auditoria')?.classList.add('d-none');
+      document.getElementById('nav-item-caja')?.classList.add('d-none');
+      document.getElementById('nav-item-corte')?.classList.add('d-none');
+      document.getElementById('nav-item-devotos')?.classList.add('d-none');
+      document.getElementById('columna-egreso')?.classList.add('d-none');
+      navegarA('vista-enseres');
     } else if (rolId === 5) {
       // CAJERO: Solo cobros, corte diario e inscripciones
       document.getElementById('nav-item-corte')?.classList.remove('d-none');
       document.getElementById('nav-item-anda')?.classList.add('d-none');
       document.getElementById('nav-item-reportes')?.classList.add('d-none');
       document.getElementById('nav-item-usuarios')?.classList.add('d-none');
+      
       document.getElementById('nav-item-auditoria')?.classList.add('d-none');
       document.getElementById('columna-egreso')?.classList.add('d-none');
     } else {
@@ -821,7 +838,7 @@ function actualizarNavPorSesion() {
     if (btnSalir) btnSalir.classList.add('d-none');
     if (infoSesion) infoSesion.classList.add('d-none');
 
-    ['nav-item-devotos','nav-item-caja','nav-item-corte','nav-item-anda','nav-item-reportes','nav-item-usuarios','nav-item-auditoria'].forEach(id => {
+    ['nav-item-devotos','nav-item-caja','nav-item-corte','nav-item-anda','nav-item-reportes','nav-item-enseres','nav-item-usuarios','nav-item-auditoria'].forEach(id => {
       document.getElementById(id)?.classList.add('d-none');
     });
   }
@@ -934,5 +951,179 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!res.ok) return alert(data.mensaje || 'Error al restablecer');
     alert('Contraseña restablecida exitosamente');
     bootstrap.Modal.getInstance(document.getElementById('modalRestablecerPass'))?.hide();
+  });
+});
+
+// ==============================================================
+// GESTIÓN DE INVENTARIO DE ENSERES Y KARDEX (ADMIN)
+// ==============================================================
+let listaEnseresLocal = [];
+
+async function cargarEnseres() {
+  const tbody = document.getElementById('tabla-enseres-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando inventario...</td></tr>';
+
+  try {
+    const res = await fetchAutenticado('/enseres');
+    const data = await res.json();
+    listaEnseresLocal = data.catalogo || [];
+
+    document.getElementById('total-enseres-badge').textContent = `${listaEnseresLocal.length} artículo(s) registrados`;
+    renderizarTablaEnseres(listaEnseresLocal);
+  } catch (err) {
+    console.error('Error al cargar enseres:', err);
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Error al cargar el inventario de enseres.</td></tr>';
+  }
+}
+
+function renderizarTablaEnseres(articulos) {
+  const tbody = document.getElementById('tabla-enseres-body');
+  if (!tbody) return;
+
+  if (articulos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No hay enseres registrados en el catálogo.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = articulos.map(a => {
+    const stock = a.Total_Existencias ?? 0;
+    const stockBadge = stock > 5 
+      ? `<span class="badge bg-success">${stock} unids</span>` 
+      : (stock > 0 
+          ? `<span class="badge bg-warning text-dark">${stock} unids</span>` 
+          : `<span class="badge bg-danger">Agotado (0)</span>`);
+
+    return `
+      <tr>
+        <td><span class="badge bg-light text-dark font-monospace">${a.ID_Enser}</span></td>
+        <td class="fw-semibold text-morado">${a.Nombre_Articulo}</td>
+        <td class="text-muted small">${a.Descripcion || '<span class="fst-italic text-secondary">Sin descripción</span>'}</td>
+        <td class="text-center">${stockBadge}</td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-success" onclick="abrirMovimientoKardex(${a.ID_Enser}, '${a.Nombre_Articulo.replace(/'/g, "\\'")}', ${stock})" title="Registrar Movimiento">
+              <i class="bi bi-arrow-left-right me-1"></i>Kardex
+            </button>
+            <button class="btn btn-outline-secondary" onclick="abrirHistorialKardex(${a.ID_Enser})" title="Ver Historial">
+              <i class="bi bi-clock-history"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.abrirNuevoEnser = function() {
+  document.getElementById('form-nuevo-enser').reset();
+  new bootstrap.Modal(document.getElementById('modalNuevoEnser')).show();
+};
+
+window.abrirMovimientoKardex = function(id, nombre, stock) {
+  document.getElementById('form-movimiento-kardex').reset();
+  document.getElementById('kardex-enser-id').value = id;
+  document.getElementById('kardex-enser-nombre').textContent = nombre;
+  document.getElementById('kardex-stock-actual').textContent = stock + ' unidades';
+  new bootstrap.Modal(document.getElementById('modalMovimientoKardex')).show();
+};
+
+window.abrirHistorialKardex = async function(id) {
+  const tbody = document.getElementById('historial-kardex-body');
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Cargando bitácora...</td></tr>';
+  const modal = new bootstrap.Modal(document.getElementById('modalHistorialKardex'));
+  modal.show();
+
+  try {
+    const res = await fetchAutenticado('/enseres/' + id + '/kardex');
+    const data = await res.json();
+    document.getElementById('historial-articulo-nombre').textContent = data.articulo || 'Artículo #' + id;
+    document.getElementById('historial-stock-badge').textContent = (data.existenciasActuales ?? 0) + ' unidades';
+
+    if (!data.movimientos || data.movimientos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin movimientos registrados para este artículo.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.movimientos.map(m => {
+      const esEntrada = m.Tipo_Operacion === 'ENTRADA';
+      const badge = esEntrada ? '<span class="badge bg-success">ENTRADA</span>' : '<span class="badge bg-danger">SALIDA</span>';
+      const fecha = m.Fecha_Movimiento ? new Date(m.Fecha_Movimiento).toLocaleString() : 'N/A';
+      return `
+        <tr>
+          <td class="small font-monospace">${fecha}</td>
+          <td>${badge}</td>
+          <td class="text-center fw-bold">${m.Cantidad}</td>
+          <td><span class="badge bg-light text-dark">${m.Estado_Conservacion || 'Bueno'}</span></td>
+          <td class="small text-muted">${m.Responsable || 'Admin'}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Error al consultar el historial.</td></tr>';
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Buscador en tiempo real de enseres
+  document.getElementById('buscar-enser')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    const filtrados = listaEnseresLocal.filter(a => 
+      a.Nombre_Articulo.toLowerCase().includes(q) || 
+      (a.Descripcion && a.Descripcion.toLowerCase().includes(q))
+    );
+    renderizarTablaEnseres(filtrados);
+  });
+
+  // Guardar nuevo enser
+  document.getElementById('form-nuevo-enser')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nombreArticulo = document.getElementById('enser-nombre').value.trim();
+    const descripcion = document.getElementById('enser-descripcion').value.trim();
+
+    try {
+      const res = await fetchAutenticado('/enseres', {
+        method: 'POST',
+        body: JSON.stringify({ nombreArticulo, descripcion })
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.mensaje || 'Error al registrar el enser');
+
+      alert('Enser registrado exitosamente');
+      bootstrap.Modal.getInstance(document.getElementById('modalNuevoEnser'))?.hide();
+      cargarEnseres();
+    } catch (err) {
+      alert('Error de conexión al registrar el enser');
+    }
+  });
+
+  // Procesar movimiento de kardex
+  document.getElementById('form-movimiento-kardex')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const idEnser = parseInt(document.getElementById('kardex-enser-id').value, 10);
+    const tipoOperacion = document.getElementById('kardex-tipo').value;
+    const cantidad = parseInt(document.getElementById('kardex-cantidad').value, 10);
+    const estadoConservacion = document.getElementById('kardex-conservacion').value;
+
+    try {
+      const res = await fetchAutenticado('/enseres/kardex/movimiento', {
+        method: 'POST',
+        body: JSON.stringify({
+          idEnser,
+          idUsuarioResponsable: usuarioActual?.idUsuario || 1,
+          tipoOperacion,
+          cantidad,
+          estadoConservacion
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.mensaje || 'Error al procesar el movimiento');
+
+      alert(data.mensaje || 'Movimiento registrado exitosamente');
+      bootstrap.Modal.getInstance(document.getElementById('modalMovimientoKardex'))?.hide();
+      cargarEnseres();
+    } catch (err) {
+      alert('Error de conexión al procesar el movimiento en Kardex');
+    }
   });
 });
