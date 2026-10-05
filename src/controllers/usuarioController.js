@@ -14,11 +14,12 @@ const UsuarioController = {
       `);
       return res.status(200).json({ total: usuarios.length, usuarios });
     } catch (error) {
+      console.error('Error al listar usuarios:', error);
       return res.status(500).json({ mensaje: 'Error al listar usuarios' });
     }
   },
 
-  // POST /api/usuarios (Alta de nuevo usuario)
+  // POST /api/usuarios
   async crear(req, res) {
     try {
       const { nombres, correo, password, idRol } = req.body;
@@ -40,31 +41,82 @@ const UsuarioController = {
 
       return res.status(201).json({ mensaje: 'Usuario creado exitosamente' });
     } catch (error) {
-      return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+      console.error('Error al crear usuario:', error);
+      return res.status(500).json({ mensaje: 'Error interno al crear usuario' });
     }
   },
 
-  // PATCH /api/usuarios/:id/estado (Alta / Baja lógica)
+  // PATCH /api/usuarios/:id/estado
   async alternarEstado(req, res) {
     try {
       const { id } = req.params;
-      const { estadoActivo } = req.body; // 1 = Activo, 0 = Inactivo
-
-      if (estadoActivo !== 0 && estadoActivo !== 1) {
-        return res.status(400).json({ mensaje: 'El estado debe ser 1 (activo) o 0 (inactivo)' });
+      const user = await getQuery('SELECT Estado_Activo FROM Usuario WHERE ID_Usuario = ?', [id]);
+      if (!user) {
+        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
       }
 
-      // Evitar que el administrador se desactive a sí mismo
-      if (req.usuario && req.usuario.idUsuario === parseInt(id, 10)) {
-        return res.status(400).json({ mensaje: 'No puedes desactivar tu propia cuenta de administrador' });
-      }
+      const nuevoEstado = user.Estado_Activo === 1 ? 0 : 1;
+      await runQuery('UPDATE Usuario SET Estado_Activo = ? WHERE ID_Usuario = ?', [nuevoEstado, id]);
 
-      await runQuery('UPDATE Usuario SET Estado_Activo = ? WHERE ID_Usuario = ?', [estadoActivo, id]);
-      return res.status(200).json({ 
-        mensaje: `Usuario ${estadoActivo === 1 ? 'activado' : 'desactivado (baja lógica)'} correctamente` 
-      });
+      return res.status(200).json({ mensaje: `Usuario ${nuevoEstado === 1 ? 'activado' : 'desactivado'} con éxito`, nuevoEstado });
     } catch (error) {
-      return res.status(500).json({ mensaje: 'Error al actualizar estado del usuario' });
+      console.error('Error al alternar estado:', error);
+      return res.status(500).json({ mensaje: 'Error al cambiar estado' });
+    }
+  },
+
+  // PUT /api/usuarios/:id
+  async actualizarUsuario(req, res) {
+    try {
+      const { id } = req.params;
+      const { nombres, correo, idRol, estadoActivo } = req.body;
+
+      if (!nombres || !correo || !idRol) {
+        return res.status(400).json({ mensaje: 'Nombres, correo y rol son requeridos' });
+      }
+
+      const duplicado = await getQuery(
+        'SELECT ID_Usuario FROM Usuario WHERE Correo_Institucional = ? AND ID_Usuario != ?',
+        [correo.trim().toLowerCase(), id]
+      );
+      if (duplicado) {
+        return res.status(409).json({ mensaje: 'El correo ya pertenece a otro usuario' });
+      }
+
+      await runQuery(
+        `UPDATE Usuario 
+         SET Nombres = ?, Correo_Institucional = ?, ID_Rol = ?, Estado_Activo = ?
+         WHERE ID_Usuario = ?`,
+        [nombres.trim(), correo.trim().toLowerCase(), idRol, estadoActivo !== undefined ? estadoActivo : 1, id]
+      );
+
+      return res.status(200).json({ mensaje: 'Usuario actualizado exitosamente' });
+    } catch (error) {
+      console.error('Error al actualizar usuario:', error);
+      return res.status(500).json({ mensaje: 'Error al actualizar datos del usuario' });
+    }
+  },
+
+  // PATCH /api/usuarios/:id/password
+  async restablecerPassword(req, res) {
+    try {
+      const { id } = req.params;
+      const { nuevaPassword } = req.body;
+
+      if (!nuevaPassword || nuevaPassword.trim().length < 6) {
+        return res.status(400).json({ mensaje: 'La contraseña debe contener al menos 6 caracteres' });
+      }
+
+      const hash = await bcrypt.hash(nuevaPassword.trim(), 10);
+      await runQuery(
+        'UPDATE Usuario SET Password_Hash = ? WHERE ID_Usuario = ?',
+        [hash, id]
+      );
+
+      return res.status(200).json({ mensaje: 'Contraseña restablecida correctamente' });
+    } catch (error) {
+      console.error('Error al restablecer contraseña:', error);
+      return res.status(500).json({ mensaje: 'Error al restablecer contraseña' });
     }
   }
 };

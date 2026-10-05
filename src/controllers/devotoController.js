@@ -41,24 +41,9 @@ const DevotoController = {
         return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
       }
 
-      // Validación de DPI: 13 dígitos numéricos
-      const dpiRegex = /^[0-9]{13}$/;
-      if (!dpiRegex.test(dpi)) {
-        return res.status(400).json({ mensaje: 'El DPI debe contener exactamente 13 dígitos numéricos' });
-      }
-
-      // Validación de Estatura: Entero estricto en centímetros
-      const estatura = Number(estaturaHombroCm);
-      if (!Number.isInteger(estatura) || estatura < 120 || estatura > 210) {
-        return res.status(400).json({ 
-          mensaje: 'La estatura de hombro debe ser un número entero en centímetros entre 120 y 210 (sin decimales)' 
-        });
-      }
-
-      // Evitar duplicidad de DPI
-      const existeDevoto = await DevotoModel.findByDPI(dpi);
-      if (existeDevoto) {
-        return res.status(409).json({ mensaje: 'Ya existe un devoto registrado con este número de DPI' });
+      const existe = await DevotoModel.findByDPI(dpi);
+      if (existe) {
+        return res.status(409).json({ mensaje: 'Ya existe un devoto registrado con este DPI' });
       }
 
       const nuevoDevoto = await DevotoModel.create({
@@ -67,16 +52,48 @@ const DevotoController = {
         apellidos,
         telefono,
         correo,
-        estaturaHombroCm: estatura
+        estaturaHombroCm
       });
 
       return res.status(201).json({
-        mensaje: 'Devoto registrado exitosamente en el padrón',
+        mensaje: 'Devoto registrado exitosamente',
         devoto: nuevoDevoto
       });
     } catch (error) {
       console.error('Error al registrar devoto:', error);
-      return res.status(500).json({ mensaje: 'Error al registrar devoto en la base de datos' });
+      return res.status(500).json({ mensaje: 'Error interno al registrar el devoto' });
+    }
+  },
+
+  // PUT /api/devotos/:id
+  async actualizarDevoto(req, res) {
+    try {
+      const { id } = req.params;
+      const { dpi, nombres, apellidos, telefono, correo, estaturaHombroCm, estadoActivo } = req.body;
+
+      if (!dpi || !nombres || !apellidos || !telefono || !correo || estaturaHombroCm === undefined) {
+        return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
+      }
+
+      const existe = await DevotoModel.findById(id);
+      if (!existe) {
+        return res.status(404).json({ mensaje: 'Devoto no encontrado' });
+      }
+
+      const actualizado = await DevotoModel.update(id, {
+        dpi,
+        nombres,
+        apellidos,
+        telefono,
+        correo,
+        estaturaHombroCm,
+        estadoActivo: estadoActivo !== undefined ? estadoActivo : existe.Estado_Activo
+      });
+
+      return res.status(200).json({ mensaje: 'Datos del devoto actualizados exitosamente', devoto: actualizado });
+    } catch (error) {
+      console.error('Error al actualizar devoto:', error);
+      return res.status(500).json({ mensaje: 'Error al actualizar el devoto en el servidor' });
     }
   }
 };

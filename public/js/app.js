@@ -191,6 +191,9 @@ async function cargarDevotos() {
           <td>${d.Correo_Electronico}</td>
           <td><span class="badge bg-info text-dark">${d.Estatura_Hombro_cm} cm</span></td>
           <td><span class="badge bg-success">Activo</span></td>
+          ${usuarioActual && (usuarioActual.idRol === 1 || usuarioActual.idRol === 2) ? 
+            `<td class="text-end"><button class="btn btn-sm btn-outline-morado" onclick="abrirEditarDevoto(${d.ID_Devoto})"><i class="bi bi-pencil-square me-1"></i>Editar</button></td>` : 
+            '<td class="text-end"></td>'}
         </tr>
       `;
     });
@@ -206,7 +209,8 @@ async function manejarRegistroDevoto(e) {
   const apellidos = document.getElementById('devoto-apellidos').value;
   const telefono = document.getElementById('devoto-telefono').value;
   const correo = document.getElementById('devoto-correo').value;
-  const estaturaHombroCm = parseInt(document.getElementById('devoto-estatura').value, 10);
+  const elAlt = document.getElementById("devoto-altura") || document.getElementById("devoto-estatura");
+  const estaturaHombroCm = elAlt ? parseFloat(elAlt.value) : 0;
 
   const res = await fetchAutenticado('/devotos', {
     method: 'POST',
@@ -415,9 +419,12 @@ async function cargarUsuarios() {
             </span>
           </td>
           <td class="text-end">
-            ${u.ID_Usuario === usuarioActual.idUsuario ? 
-              '<span class="text-muted small">Tu cuenta</span>' : 
-              `<button class="btn btn-sm ${esActivo ? 'btn-outline-danger' : 'btn-outline-success'}" 
+            ${u.ID_Usuario === usuarioActual.idUsuario ? `<div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" onclick="abrirEditarUsuario(${u.ID_Usuario})" title="Modificar"><i class="bi bi-pencil"></i></button><button class="btn btn-outline-warning text-dark" onclick="abrirRestablecerPassword(${u.ID_Usuario}, '${u.Nombres.replace(/'/g, "\\'")}')" title="Restablecer Clave"><i class="bi bi-key-fill"></i></button></div>` : 
+              `<div class="btn-group btn-group-sm me-1">
+       <button class="btn btn-outline-primary" onclick="abrirEditarUsuario(${u.ID_Usuario})" title="Modificar"><i class="bi bi-pencil"></i></button>
+       <button class="btn btn-outline-warning text-dark" onclick="abrirRestablecerPassword(${u.ID_Usuario}, '${u.Nombres}')" title="Restablecer Clave"><i class="bi bi-key-fill"></i></button>
+     </div>
+     <button class="btn btn-sm ${esActivo ? 'btn-outline-danger' : 'btn-outline-success'}" 
                 onclick="alternarEstadoUsuario(${u.ID_Usuario},${esActivo ? 0 : 1})">
                 <i class="bi ${esActivo ? 'bi-person-slash' : 'bi-person-check'} me-1"></i>${esActivo ? 'Dar de Baja' : 'Reactivar'}
               </button>`
@@ -823,4 +830,109 @@ function actualizarNavPorSesion() {
 
 window.addEventListener('DOMContentLoaded', () => {
   actualizarNavPorSesion();
+});
+
+// ==============================================================
+// FUNCIONES ADMINISTRATIVAS: EDICIÓN DE USUARIOS Y DEVOTOS
+// ==============================================================
+window.abrirEditarDevoto = async function(id) {
+  try {
+    const res = await fetch(`${API_URL}/devotos`);
+    const data = await res.json();
+    const devoto = (data.devotos || []).find(d => d.ID_Devoto === id || d.id === id);
+    if (!devoto) return alert('Devoto no encontrado');
+
+    document.getElementById('edit-devoto-id').value = devoto.ID_Devoto || devoto.id;
+    document.getElementById('edit-devoto-dpi').value = devoto.DPI || '';
+    document.getElementById('edit-devoto-nombres').value = devoto.Nombres || '';
+    document.getElementById('edit-devoto-apellidos').value = devoto.Apellidos || '';
+    document.getElementById('edit-devoto-telefono').value = devoto.Telefono || '';
+    document.getElementById('edit-devoto-altura').value = devoto.Estatura_Hombro_cm || '';
+    document.getElementById('edit-devoto-correo').value = devoto.Correo_Electronico || '';
+    document.getElementById('edit-devoto-activo').checked = (devoto.Estado_Activo === 1);
+
+    new bootstrap.Modal(document.getElementById('modalEditarDevoto')).show();
+  } catch (e) {
+    alert('Error al cargar datos del devoto');
+  }
+};
+
+window.abrirEditarUsuario = async function(id) {
+  try {
+    const res = await fetchAutenticado('/usuarios');
+    const data = await res.json();
+    const usuario = (data.usuarios || []).find(u => u.ID_Usuario === id || u.id === id);
+    if (!usuario) return alert('Usuario no encontrado');
+
+    document.getElementById('edit-user-id').value = usuario.ID_Usuario;
+    document.getElementById('edit-user-nombres').value = usuario.Nombres || '';
+    document.getElementById('edit-user-correo').value = usuario.Correo_Institucional || '';
+    document.getElementById('edit-user-rol').value = usuario.ID_Rol;
+    document.getElementById('edit-user-activo').checked = (usuario.Estado_Activo === 1);
+
+    new bootstrap.Modal(document.getElementById('modalEditarUsuario')).show();
+  } catch (e) {
+    alert('Error al cargar datos del usuario');
+  }
+};
+
+window.abrirRestablecerPassword = function(id, nombre) {
+  document.getElementById('reset-user-id').value = id;
+  document.getElementById('reset-user-nombre').textContent = nombre;
+  document.getElementById('reset-user-newpass').value = '';
+  new bootstrap.Modal(document.getElementById('modalRestablecerPass')).show();
+};
+
+// Eventos de envío para los formularios de edición
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('form-editar-devoto')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-devoto-id').value;
+    const body = {
+      dpi: document.getElementById('edit-devoto-dpi').value.trim(),
+      nombres: document.getElementById('edit-devoto-nombres').value.trim(),
+      apellidos: document.getElementById('edit-devoto-apellidos').value.trim(),
+      telefono: document.getElementById('edit-devoto-telefono').value.trim(),
+      correo: document.getElementById('edit-devoto-correo').value.trim(),
+      estaturaHombroCm: parseFloat(document.getElementById('edit-devoto-altura').value),
+      estadoActivo: document.getElementById('edit-devoto-activo').checked ? 1 : 0
+    };
+    const res = await fetchAutenticado(`/devotos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) return alert(data.mensaje || 'Error al actualizar');
+    alert('Devoto actualizado');
+    bootstrap.Modal.getInstance(document.getElementById('modalEditarDevoto'))?.hide();
+    cargarDevotos();
+  });
+
+  document.getElementById('form-editar-usuario')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-user-id').value;
+    const body = {
+      nombres: document.getElementById('edit-user-nombres').value.trim(),
+      correo: document.getElementById('edit-user-correo').value.trim(),
+      idRol: parseInt(document.getElementById('edit-user-rol').value),
+      estadoActivo: document.getElementById('edit-user-activo').checked ? 1 : 0
+    };
+    const res = await fetchAutenticado(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) return alert(data.mensaje || 'Error al actualizar');
+    alert('Usuario actualizado');
+    bootstrap.Modal.getInstance(document.getElementById('modalEditarUsuario'))?.hide();
+    cargarUsuarios();
+  });
+
+  document.getElementById('form-restablecer-pass')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('reset-user-id').value;
+    const nuevaPassword = document.getElementById('reset-user-newpass').value;
+    const res = await fetchAutenticado(`/usuarios/${id}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ nuevaPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.mensaje || 'Error al restablecer');
+    alert('Contraseña restablecida exitosamente');
+    bootstrap.Modal.getInstance(document.getElementById('modalRestablecerPass'))?.hide();
+  });
 });
