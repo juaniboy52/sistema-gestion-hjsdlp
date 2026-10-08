@@ -1,10 +1,11 @@
 const EnseresModel = require('../models/enseresModel');
 
 const EnseresController = {
-  // GET /api/enseres
+  // GET /api/enseres (Admin ve todos; Encargado Rol 4 ve solo activos)
   async listar(req, res) {
     try {
-      const catalogo = await EnseresModel.listarCatalogo();
+      const soloActivos = !req.usuario || req.usuario.idRol !== 1;
+      const catalogo = await EnseresModel.listarCatalogo(soloActivos);
       return res.status(200).json({
         totalArticulos: catalogo.length,
         catalogo
@@ -15,7 +16,7 @@ const EnseresController = {
     }
   },
 
-  // POST /api/enseres
+  // POST /api/enseres (Solo Admin)
   async crear(req, res) {
     try {
       const { nombreArticulo, descripcion } = req.body;
@@ -34,12 +35,52 @@ const EnseresController = {
     }
   },
 
-  // POST /api/enseres/kardex/movimiento
+  // PUT /api/enseres/:id (Solo Admin)
+  async actualizar(req, res) {
+    try {
+      const { id } = req.params;
+      const { nombreArticulo, descripcion, estadoActivo } = req.body;
+      if (!nombreArticulo) {
+        return res.status(400).json({ mensaje: 'El nombre del artículo es obligatorio' });
+      }
+
+      const articulo = await EnseresModel.actualizarEnser(id, {
+        nombreArticulo,
+        descripcion,
+        estadoActivo: estadoActivo !== undefined ? estadoActivo : 1
+      });
+      return res.status(200).json({ mensaje: 'Artículo actualizado exitosamente', articulo });
+    } catch (error) {
+      console.error('Error al actualizar enser:', error);
+      return res.status(500).json({ mensaje: 'Error al actualizar artículo' });
+    }
+  },
+
+  // PATCH /api/enseres/:id/estado (Solo Admin)
+  async alternarEstado(req, res) {
+    try {
+      const { id } = req.params;
+      const { estadoActivo } = req.body;
+      if (estadoActivo === undefined) {
+        return res.status(400).json({ mensaje: 'El nuevo estado es requerido' });
+      }
+
+      await EnseresModel.alternarEstadoEnser(id, estadoActivo);
+      return res.status(200).json({ 
+        mensaje: estadoActivo === 1 ? 'Artículo reactivado en catálogo' : 'Artículo dado de baja' 
+      });
+    } catch (error) {
+      console.error('Error al cambiar estado de enser:', error);
+      return res.status(500).json({ mensaje: 'Error al alternar estado del artículo' });
+    }
+  },
+
+  // POST /api/enseres/kardex/movimiento (Admin y Enseres)
   async registrarMovimiento(req, res) {
     try {
       const {
         idEnser,
-        idUsuarioResponsable = 1,
+        idUsuarioResponsable = req.usuario?.idUsuario || 1,
         tipoOperacion,
         cantidad,
         estadoConservacion = 'Bueno'
@@ -64,7 +105,6 @@ const EnseresController = {
         return res.status(404).json({ mensaje: 'El artículo indicado no existe' });
       }
 
-      // Regla de inventario: No permitir existencias negativas
       if (tipo === 'SALIDA' && enser.Total_Existencias < cant) {
         return res.status(409).json({
           mensaje: `Stock insuficiente. Existencias actuales: ${enser.Total_Existencias}, cantidad solicitada: ${cant}`
@@ -89,7 +129,7 @@ const EnseresController = {
     }
   },
 
-  // GET /api/enseres/:idEnser/kardex
+  // GET /api/enseres/:idEnser/kardex (Admin y Enseres)
   async verHistorial(req, res) {
     try {
       const { idEnser } = req.params;

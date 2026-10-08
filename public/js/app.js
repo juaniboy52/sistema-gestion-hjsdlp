@@ -53,6 +53,7 @@ function navegarA(vistaId) {
   }
   if (vistaId === 'vista-usuarios' && typeof cargarUsuarios === 'function') cargarUsuarios();
   if (vistaId === 'vista-auditoria' && typeof cargarAuditoria === 'function') cargarAuditoria();
+  if (vistaId === 'vista-enseres' && typeof cargarEnseres === 'function') cargarEnseres();
 }
 
 // 2. Autenticación y Cierre de Sesión
@@ -1127,3 +1128,117 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+
+// ==============================================================
+// GESTIÓN DE ENSERES, KARDEX Y CONTROL DE ACCESO
+// ==============================================================
+// (listaEnseresLocal ya declarada previamente)
+
+async function cargarEnseres() {
+  const tbody = document.getElementById('tabla-enseres-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando inventario...</td></tr>';
+
+  try {
+    const res = await fetchAutenticado('/enseres');
+    const data = await res.json();
+    listaEnseresLocal = data.catalogo || [];
+
+    const badgeTotal = document.getElementById('total-enseres-badge');
+    if (badgeTotal) badgeTotal.textContent = `${listaEnseresLocal.length} artículo(s) registrados`;
+    renderizarTablaEnseres(listaEnseresLocal);
+  } catch (err) {
+    console.error('Error al cargar enseres:', err);
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error al cargar el inventario de enseres.</td></tr>';
+  }
+}
+
+function renderizarTablaEnseres(articulos) {
+  const tbody = document.getElementById('tabla-enseres-body');
+  if (!tbody) return;
+
+  if (articulos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay enseres registrados en el catálogo.</td></tr>';
+    return;
+  }
+
+  const esAdmin = usuarioActual && usuarioActual.idRol === 1;
+
+  tbody.innerHTML = articulos.map(a => {
+    const stock = a.Total_Existencias ?? 0;
+    const esActivo = (a.Estado_Activo === 1 || a.Estado_Activo === true);
+    
+    const stockBadge = stock > 5 
+      ? `<span class="badge bg-success">${stock} unids</span>` 
+      : (stock > 0 
+          ? `<span class="badge bg-warning text-dark">${stock} unids</span>` 
+          : `<span class="badge bg-danger">Agotado (0)</span>`);
+
+    const estadoBadge = esActivo 
+      ? '<span class="badge bg-success">Activo</span>' 
+      : '<span class="badge bg-secondary">De Baja</span>';
+
+    return `
+      <tr class="${!esActivo ? 'table-light opacity-75' : ''}">
+        <td><span class="badge bg-light text-dark font-monospace">${a.ID_Enser}</span></td>
+        <td class="fw-semibold text-morado">${a.Nombre_Articulo}</td>
+        <td class="text-muted small">${a.Descripcion || '<span class="fst-italic text-secondary">Sin descripción</span>'}</td>
+        <td class="text-center">${stockBadge}</td>
+        ${esAdmin ? `<td class="text-center">${estadoBadge}</td>` : ''}
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-success" onclick="abrirMovimientoKardex(${a.ID_Enser}, '${a.Nombre_Articulo.replace(/'/g, "\\'")}', ${stock})" title="Registrar Kardex">
+              <i class="bi bi-arrow-left-right me-1"></i>Kardex
+            </button>
+            <button class="btn btn-outline-secondary" onclick="abrirHistorialKardex(${a.ID_Enser})" title="Historial">
+              <i class="bi bi-clock-history"></i>
+            </button>
+            ${esAdmin ? `
+              <button class="btn btn-outline-primary" onclick="abrirEditarEnser(${a.ID_Enser})" title="Modificar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn ${esActivo ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="alternarEstadoEnser(${a.ID_Enser}, ${esActivo ? 0 : 1})" title="${esActivo ? 'Dar de baja' : 'Reactivar'}">
+                <i class="bi ${esActivo ? 'bi-trash' : 'bi-arrow-counterclockwise'}"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.abrirNuevoEnser = function() {
+  document.getElementById('form-nuevo-enser')?.reset();
+  new bootstrap.Modal(document.getElementById('modalNuevoEnser')).show();
+};
+
+window.abrirEditarEnser = function(id) {
+  const a = listaEnseresLocal.find(item => item.ID_Enser === id);
+  if (!a) return alert('Artículo no encontrado');
+
+  document.getElementById('edit-enser-id').value = a.ID_Enser;
+  document.getElementById('edit-enser-nombre').value = a.Nombre_Articulo || '';
+  document.getElementById('edit-enser-descripcion').value = a.Descripcion || '';
+  document.getElementById('edit-enser-activo').checked = (a.Estado_Activo === 1 || a.Estado_Activo === true);
+
+  new bootstrap.Modal(document.getElementById('modalEditarEnser')).show();
+};
+
+window.alternarEstadoEnser = async function(id, nuevoEstado) {
+  const accion = nuevoEstado === 1 ? 'reactivar' : 'dar de baja';
+  if (!confirm(`¿Estás seguro de que deseas ${accion} este artículo del catálogo?`)) return;
+
+  try {
+    const res = await fetchAutenticado('/enseres/' + id + '/estado', {
+      method: 'PATCH',
+      body: JSON.stringify({ estadoActivo: nuevoEstado })
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.mensaje || 'Error al cambiar estado');
+    cargarEnseres();
+  } catch (e) {
+    alert('Error al comunicar con el servidor para cambiar estado');
+  }
+};

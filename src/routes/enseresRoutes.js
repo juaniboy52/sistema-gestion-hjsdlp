@@ -3,12 +3,16 @@ const router = express.Router();
 const EnseresController = require('../controllers/enseresController');
 const { verificarToken, permitirRoles } = require('../middlewares/authMiddleware');
 
-// Solo Administrador (1) y Encargado de Enseres (4) tienen acceso
-router.use(verificarToken, permitirRoles(1, 4));
+router.use(verificarToken);
 
-router.get('/', EnseresController.listar);
-router.post('/', EnseresController.crear);
-router.post('/kardex/movimiento', EnseresController.registrarMovimiento);
-router.get('/:idEnser/kardex', EnseresController.verHistorial);
+// Consulta y movimientos permitidos para Admin (1) y Enseres (4)
+router.get('/', permitirRoles(1, 4), EnseresController.listar);
+router.post('/kardex/movimiento', permitirRoles(1, 4), EnseresController.registrarMovimiento);
+router.get('/:idEnser/kardex', permitirRoles(1, 4), EnseresController.verHistorial);
+
+// Modificación y bajas exclusivo para Administradores (1)
+router.post('/', permitirRoles(1), EnseresController.crear);
+router.put('/:id', permitirRoles(1), EnseresController.actualizar);
+router.patch('/:id/estado', permitirRoles(1), EnseresController.alternarEstado);
 
 module.exports = router;
