@@ -1,3 +1,161 @@
+
+// ==========================================
+// FUNCIONES DE CONTROL DEL VISUALIZADOR Y ANDAS
+// ==========================================
+window.cambiarAndaVisualizador = function(idAnda) {
+  window.andaSeleccionadaId = idAnda;
+  const select = document.getElementById("select-anda-visualizar");
+  if (select && select.value != idAnda) select.value = idAnda;
+
+  const anda = (window.listaAndasGlobal || []).find(a => a.ID_Anda == idAnda);
+  if (anda) {
+    const badgeBrazos = document.getElementById("badge-total-brazos");
+    if (badgeBrazos) badgeBrazos.innerText = (anda.Cantidad_Brazos || 40) + " Brazos";
+    
+    const desc = document.getElementById("descripcion-cortejo-activa");
+    if (desc) desc.innerText = anda.Descripcion || ("Cortejo Procesional - Temporada " + (anda.Anio_Temporada || 2026));
+
+    // Ajustar opciones del select de turnos
+    const selTurno = document.getElementById("select-turno-visualizar");
+    if (selTurno) {
+      const turnos = anda.Cantidad_Turnos || 5;
+      selTurno.innerHTML = "";
+      for (let t = 1; t <= turnos; t++) {
+        selTurno.innerHTML += `<option value="${t}">Turno ${t}</option>`;
+      }
+    }
+  }
+
+  if (typeof cargarDistribucionAnda === 'function') {
+    cargarDistribucionAnda();
+  }
+};
+
+window.abrirModalEditarAnda = function() {
+  const select = document.getElementById("select-anda-visualizar");
+  const idAnda = select ? select.value : (window.andaSeleccionadaId || 1);
+  const anda = (window.listaAndasGlobal || []).find(a => a.ID_Anda == idAnda);
+
+  if (!anda) {
+    alert("Por favor selecciona un anda válida para editar.");
+    return;
+  }
+
+  document.getElementById("modalEditarAndaTitulo").innerText = "Editar Anda Procesional";
+  document.getElementById("edit-anda-id").value = anda.ID_Anda;
+  document.getElementById("edit-anda-nombre").value = anda.Nombre_Anda || '';
+  document.getElementById("edit-anda-brazos").value = anda.Cantidad_Brazos || 40;
+  document.getElementById("edit-anda-turnos").value = anda.Cantidad_Turnos || 5;
+  document.getElementById("edit-anda-anio").value = anda.Anio_Temporada || 2026;
+  document.getElementById("edit-anda-descripcion").value = anda.Descripcion || '';
+
+  const modalEl = document.getElementById("modalEditarAnda");
+  const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+  modal.show();
+};
+
+window.abrirModalCrearAnda = function() {
+  document.getElementById("modalEditarAndaTitulo").innerText = "Registrar Nueva Anda Procesional";
+  document.getElementById("edit-anda-id").value = "";
+  document.getElementById("edit-anda-nombre").value = "";
+  document.getElementById("edit-anda-brazos").value = 40;
+  document.getElementById("edit-anda-turnos").value = 5;
+  document.getElementById("edit-anda-anio").value = 2026;
+  document.getElementById("edit-anda-descripcion").value = "";
+
+  const modalEl = document.getElementById("modalEditarAnda");
+  const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+  modal.show();
+};
+
+window.guardarDatosAnda = async function(e) {
+  e.preventDefault();
+  const idInput = document.getElementById("edit-anda-id");
+  let id = idInput ? idInput.value : "";
+  if (!id && window.andaSeleccionadaId) {
+    id = window.andaSeleccionadaId;
+  }
+
+  const nombre = document.getElementById("edit-anda-nombre").value.trim();
+  const brazos = parseInt(document.getElementById("edit-anda-brazos").value, 10);
+  const turnos = parseInt(document.getElementById("edit-anda-turnos").value, 10);
+  const anio = parseInt(document.getElementById("edit-anda-anio").value, 10) || 2026;
+  const desc = document.getElementById("edit-anda-descripcion").value.trim();
+
+  const payload = {
+    nombreAnda: nombre,
+    cantidadBrazos: brazos,
+    cantidadTurnos: turnos,
+    anioTemporada: anio,
+    descripcion: desc
+  };
+
+  const url = id ? `/andas/${id}` : '/andas';
+  const metodo = id ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetchAutenticado(url, {
+      method: metodo,
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.mensaje || data.error || ("Error HTTP " + res.status));
+    }
+
+    alert(id ? "Anda actualizada correctamente." : "Anda registrada exitosamente.");
+    const modalEl = document.getElementById("modalEditarAnda");
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+
+    if (typeof cargarAndasDisponibles === 'function') {
+      await cargarAndasDisponibles();
+    }
+  } catch (err) {
+    alert("Error al guardar anda: " + err.message);
+  }
+};
+
+
+window.cargarAndasDisponibles = async function() {
+  try {
+    const res = await fetchAutenticado("/andas");
+    if (!res.ok) throw new Error("HTTP error " + res.status);
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : (data.andas || []);
+    window.listaAndasGlobal = lista;
+
+    const select = document.getElementById("select-anda-visualizar");
+    if (select) {
+      if (lista.length === 0) {
+        select.innerHTML = '<option value="">No hay andas activas</option>';
+      } else {
+        select.innerHTML = lista.map(a => 
+          `<option value="${a.ID_Anda}">${a.Nombre_Anda} (${a.Cantidad_Brazos} brazos / ${a.Cantidad_Turnos} turnos - ${a.Anio_Temporada || 2026})</option>`
+        ).join("");
+
+        if (!window.andaSeleccionadaId || !lista.some(a => a.ID_Anda == window.andaSeleccionadaId)) {
+          window.andaSeleccionadaId = lista[0].ID_Anda;
+        }
+        select.value = window.andaSeleccionadaId;
+      }
+    }
+
+    if (typeof window.cambiarAndaVisualizador === 'function' && window.andaSeleccionadaId) {
+      window.cambiarAndaVisualizador(window.andaSeleccionadaId);
+    } else if (typeof cargarDistribucionAnda === 'function') {
+      cargarDistribucionAnda();
+    }
+  } catch (err) {
+    console.error("Error cargando andas:", err);
+    const select = document.getElementById("select-anda-visualizar");
+    if (select) select.innerHTML = '<option value="">Error al cargar andas</option>';
+  }
+};
+
 const API_URL = '/api';
 
 // Usar sessionStorage para que la sesión muera al cerrar las pestañas/navegador
@@ -46,7 +204,7 @@ function navegarA(vistaId) {
   if (vistaId === 'vista-devotos' && typeof cargarDevotos === 'function') cargarDevotos();
   if (vistaId === 'vista-caja' && typeof cargarSelectDevotos === 'function') cargarSelectDevotos();
   if (vistaId === 'vista-corte-diario' && typeof cargarMisCobrosDia === 'function') cargarMisCobrosDia();
-  if (vistaId === 'vista-anda' && typeof cargarDistribucionAnda === 'function') cargarDistribucionAnda();
+  if (vistaId === 'vista-anda') { (window.cargarAndasDisponibles || cargarAndasDisponibles)(); }
   if (vistaId === 'vista-reportes') {
     if (typeof cargarReporteFinanciero === 'function') cargarReporteFinanciero();
     else if (typeof cargarReportes === 'function') cargarReportes();
@@ -317,31 +475,54 @@ async function manejarEgreso(e) {
 
 // 5. Visualizador del Anda
 async function cargarDistribucionAnda() {
-  const turno = document.getElementById('select-turno-inspeccionar').value;
-  const res = await fetchAutenticado(`/turnos/anda/1/2026`);
-  const data = await res.json();
+  const elemAnda = document.getElementById('select-anda-visualizar');
+  const idAnda = elemAnda ? elemAnda.value : (window.andaSeleccionadaId || 1);
+  if (!idAnda) return;
+
+  const anda = (window.listaAndasGlobal || []).find(a => a.ID_Anda == idAnda);
+  const totalBrazos = anda ? (anda.Cantidad_Brazos || 40) : 40;
+  const anio = anda ? (anda.Anio_Temporada || 2026) : 2026;
+
+  const elemTurno = document.getElementById('select-turno-visualizar');
+  const turno = (elemTurno && elemTurno.value) ? parseInt(elemTurno.value, 10) : 1;
 
   const contenedorIzq = document.getElementById('contenedor-brazos-izq');
   const contenedorDer = document.getElementById('contenedor-brazos-der');
+
+  if (!contenedorIzq || !contenedorDer) return;
+
   contenedorIzq.innerHTML = '';
   contenedorDer.innerHTML = '';
 
-  const cargadoresTurno = (data.turnos || []).filter(t => t.Numero_Turno == turno);
+  let cargadoresTurno = [];
+  try {
+    const res = await fetchAutenticado(`/turnos/anda/${idAnda}/${anio}`);
+    if (res.ok) {
+      const data = await res.json();
+      cargadoresTurno = (data.turnos || []).filter(t => t.Numero_Turno == turno);
+    }
+  } catch (err) {
+    console.warn("Datos de turnos no disponibles en este momento:", err);
+  }
 
-  for (let b = 1; b <= 20; b++) {
-    const izq = cargadoresTurno.find(c => c.Lado_Brazo === 'IZQUIERDO' && c.Numero_Brazo === b);
+  // Lado Izquierdo: Números Impares (1, 3, 5, 7, ..., hasta totalBrazos)
+  for (let b = 1; b <= totalBrazos; b += 2) {
+    const asignado = cargadoresTurno.find(c => c.Brazo_Asignado === b || (c.Numero_Brazo === b && c.Lado_Brazo === 'IZQUIERDO'));
     contenedorIzq.innerHTML += `
-      <div class="brazo-slot ${izq ? 'brazo-ocupado' : ''}">
+      <div class="brazo-slot p-2 border rounded d-flex justify-content-between align-items-center mb-1 ${asignado ? 'bg-primary text-white fw-bold' : 'bg-light'}">
         <span class="fw-bold">Brazo ${b}</span>
-        <span>${izq ? `${izq.Nombres} (${izq.Estatura_Hombro_cm} cm)` : '<span class="text-muted">Disponible</span>'}</span>
+        <span class="small">${asignado ? `${asignado.Nombres} ${asignado.Apellidos || ''} (${asignado.Estatura_Hombro_cm || 0} cm)` : '<span class="text-muted">Disponible</span>'}</span>
       </div>
     `;
+  }
 
-    const der = cargadoresTurno.find(c => c.Lado_Brazo === 'DERECHO' && c.Numero_Brazo === b);
+  // Lado Derecho: Números Pares (2, 4, 6, 8, ..., hasta totalBrazos)
+  for (let b = 2; b <= totalBrazos; b += 2) {
+    const asignado = cargadoresTurno.find(c => c.Brazo_Asignado === b || (c.Numero_Brazo === b && c.Lado_Brazo === 'DERECHO'));
     contenedorDer.innerHTML += `
-      <div class="brazo-slot ${der ? 'brazo-ocupado' : ''}">
+      <div class="brazo-slot p-2 border rounded d-flex justify-content-between align-items-center mb-1 ${asignado ? 'bg-success text-white fw-bold' : 'bg-light'}">
         <span class="fw-bold">Brazo ${b}</span>
-        <span>${der ? `${der.Nombres} (${der.Estatura_Hombro_cm} cm)` : '<span class="text-muted">Disponible</span>'}</span>
+        <span class="small">${asignado ? `${asignado.Nombres} ${asignado.Apellidos || ''} (${asignado.Estatura_Hombro_cm || 0} cm)` : '<span class="text-muted">Disponible</span>'}</span>
       </div>
     `;
   }

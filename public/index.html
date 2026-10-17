@@ -451,20 +451,119 @@
     </section>
 
     <!-- 5. VISUALIZADOR DEL ANDA -->
-    <section id="vista-anda" class="seccion-spa d-none">
-      <div class="card card-custom">
-        <div class="card-header-morado">
+        <section id="vista-anda" class="seccion-spa d-none">
+
+      <!-- GESTIÓN Y SELECCIÓN DE ANDAS -->
+      <div class="card card-custom shadow-sm border-0 mb-3 p-3 bg-white rounded-4">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-5">
+            <label class="form-label small fw-bold text-morado mb-1">
+              <i class="bi bi-diagram-3-fill me-1"></i>Seleccionar Anda / Cortejo Procesional:
+            </label>
+            <select id="select-anda-visualizar" class="form-select fw-bold border-morado" onchange="cambiarAndaVisualizador(this.value)">
+              <option value="">Cargando andas...</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-morado mb-1">
+              <i class="bi bi-clock-history me-1"></i>Turno a visualizar:
+            </label>
+            <select id="select-turno-visualizar" class="form-select border-morado" onchange="cargarDistribucionAnda()">
+              <option value="1">Turno 1</option>
+              <option value="2">Turno 2</option>
+              <option value="3">Turno 3</option>
+              <option value="4">Turno 4</option>
+              <option value="5">Turno 5</option>
+            </select>
+          </div>
+          <div class="col-md-4 text-md-end pt-md-3">
+            <button type="button" class="btn btn-morado text-white btn-sm px-3 shadow-sm fw-bold me-1" onclick="abrirModalCrearAnda()">
+              <i class="bi bi-plus-circle me-1"></i>Nueva Anda
+            </button>
+            <button type="button" class="btn btn-outline-morado btn-sm px-3 shadow-sm fw-bold me-1" onclick="abrirModalEditarAnda()">
+              <i class="bi bi-pencil-square me-1"></i>Editar Anda
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm px-3 shadow-sm fw-bold" onclick="confirmarDesactivarAnda()">
+              <i class="bi bi-slash-circle me-1"></i>Desactivar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISUALIZADOR GRÁFICO -->
+      <div class="card card-custom shadow-sm border-0 bg-white rounded-4">
+        <div class="card-header-morado p-3 text-white rounded-top-4 d-flex justify-content-between align-items-center">
           <h5 class="mb-0 font-cinzel"><i class="bi bi-grid-3x3 me-2"></i>Visualizador de Andas Procesionales</h5>
+          <span class="badge bg-warning text-dark font-cinzel px-3 py-2" id="badge-total-brazos">40 Brazos</span>
         </div>
         <div class="card-body p-4 text-center">
-          <p class="text-muted">Distribución de brazos y turnos para el Mueble de 40 Brazos (Viernes Santo).</p>
-          <div class="p-4 bg-light rounded border border-warning d-inline-block">
-            <div class="badge bg-dark px-4 py-2 mb-3 font-cinzel">FRENTE DEL ANDA (Cabecera)</div>
-            <div class="d-flex justify-content-center gap-4 my-2">
-              <span class="badge bg-primary p-2">Lado Izquierdo (20 Brazos)</span>
-              <span class="badge bg-success p-2">Lado Derecho (20 Brazos)</span>
+          <p class="text-muted small mb-3" id="descripcion-cortejo-activa">Distribución de brazos y turnos procesionales</p>
+
+          <div class="anda-plano-container p-4 mx-auto" style="max-width: 900px; background: #fafafa; border: 2px dashed #bfa15f; border-radius: 12px;">
+            <div class="badge bg-dark px-4 py-2 mb-4 font-cinzel shadow-sm">▲ FRENTE DEL ANDA (Cabecera) ▲</div>
+
+            <div class="row g-4">
+              <!-- LADO IZQUIERDO -->
+              <div class="col-md-6">
+                <div class="p-2 mb-2 bg-primary text-white rounded fw-bold text-center">Lado Izquierdo</div>
+                <div id="contenedor-brazos-izq" class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto;">
+                  <span class="text-muted small">Sin datos de cargadores</span>
+                </div>
+              </div>
+
+              <!-- LADO DERECHO -->
+              <div class="col-md-6">
+                <div class="p-2 mb-2 bg-success text-white rounded fw-bold text-center">Lado Derecho</div>
+                <div id="contenedor-brazos-der" class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto;">
+                  <span class="text-muted small">Sin datos de cargadores</span>
+                </div>
+              </div>
             </div>
-            <div class="badge bg-dark px-4 py-2 mt-3 font-cinzel">PARTE POSTERIOR (Cola)</div>
+
+            <div class="badge bg-dark px-4 py-2 mt-4 font-cinzel shadow-sm">▼ PARTE POSTERIOR (Cola) ▼</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL CREAR / EDITAR ANDA -->
+      <div class="modal fade" id="modalEditarAnda" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-morado text-white">
+              <h5 class="modal-title font-cinzel" id="modalEditarAndaTitulo">Gestionar Anda Procesional</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="form-gestionar-anda" onsubmit="guardarDatosAnda(event)">
+              <div class="modal-body p-4">
+                <input type="hidden" id="edit-anda-id" value="">
+                <div class="mb-3">
+                  <label class="form-label fw-bold small text-morado">Nombre del Cortejo / Anda</label>
+                  <input type="text" id="edit-anda-nombre" class="form-control" required placeholder="Ej. Viernes Santo - Jesús Sepultado">
+                </div>
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label fw-bold small text-morado">Cantidad de Brazos</label>
+                    <input type="number" id="edit-anda-brazos" class="form-control" required min="10" step="2" value="40">
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label fw-bold small text-morado">Cantidad de Turnos</label>
+                    <input type="number" id="edit-anda-turnos" class="form-control" required min="1" value="5">
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small text-morado">Año Temporada</label>
+                  <input type="number" id="edit-anda-anio" class="form-control" required value="2026">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold small text-morado">Descripción / Observaciones</label>
+                  <textarea id="edit-anda-descripcion" class="form-control" rows="2"></textarea>
+                </div>
+              </div>
+              <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-morado text-white btn-sm px-4 fw-bold">Guardar Cambios</button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -1028,6 +1127,86 @@
           <div class="modal-footer bg-light">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
             <button type="submit" class="btn text-white" style="background:#4A154B;">Guardar Cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: CREAR ANDA -->
+  <div class="modal fade" id="modalCrearAnda" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content border-0 shadow rounded-4">
+        <div class="card-header-morado p-3">
+          <h5 class="modal-title font-cinzel text-warning"><i class="bi bi-plus-circle me-2"></i>Nueva Anda Procesional</h5>
+        </div>
+        <form id="form-crear-anda" onsubmit="guardarNuevaAnda(event)">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Nombre del Anda / Cortejo *</label>
+              <input type="text" id="crear-anda-nombre" class="form-control" placeholder="Ej: Santo Entierro - Viernes Santo" required>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Cantidad de Brazos *</label>
+                <input type="number" id="crear-anda-brazos" class="form-control" min="12" max="140" placeholder="Ej: 40" required>
+                <div class="form-text smaller">Total de cargadores por turno.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Turnos por Recorrido *</label>
+                <input type="number" id="crear-anda-turnos" class="form-control" min="1" max="100" placeholder="Ej: 5" required>
+                <div class="form-text smaller">Total turnos del cortejo.</div>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-bold">Descripción (Opcional)</label>
+              <textarea id="crear-anda-descripcion" class="form-control" rows="2" placeholder="Detalles de recorrido o notas históricas..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-morado fw-bold font-cinzel">Crear Anda</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR ANDA -->
+  <div class="modal fade" id="modalEditarAnda" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content border-0 shadow rounded-4">
+        <div class="card-header-morado p-3">
+          <h5 class="modal-title font-cinzel text-warning"><i class="bi bi-pencil-square me-2"></i>Editar Configuración del Anda</h5>
+        </div>
+        <form id="form-editar-anda" onsubmit="guardarEdicionAnda(event)">
+          <input type="hidden" id="edit-anda-id">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Nombre del Anda / Cortejo *</label>
+              <input type="text" id="edit-anda-nombre" class="form-control" required>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Cantidad de Brazos *</label>
+                <input type="number" id="edit-anda-brazos" class="form-control" min="12" max="140" required>
+                <div class="form-text smaller">Total de cargadores por turno.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Turnos por Recorrido *</label>
+                <input type="number" id="edit-anda-turnos" class="form-control" min="1" max="100" required>
+                <div class="form-text smaller">Total turnos del cortejo.</div>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-bold">Descripción (Opcional)</label>
+              <textarea id="edit-anda-descripcion" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-morado fw-bold font-cinzel">Guardar Cambios</button>
           </div>
         </form>
       </div>

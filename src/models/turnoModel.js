@@ -67,16 +67,21 @@ const TurnoModel = {
   },
 
   // 5. Listar turnos asignados por Anda y Año
-  async listarTurnosPorAnda(idAnda, anioCuaresma) {
+      async listarTurnosPorAnda(idAnda, anioCuaresma) {
     return await allQuery(
-      `SELECT A.ID_Asignacion, A.Numero_Turno, A.Lado_Brazo, A.Numero_Brazo, A.Fecha_Asignacion,
+      `SELECT A.ID_Asignacion, A.Numero_Turno, A.Fecha_Asignacion,
+              A.Brazo_Asignado,
+              CASE 
+                WHEN (A.Brazo_Asignado % 2) != 0 THEN 'IZQUIERDO'
+                ELSE 'DERECHO'
+              END AS Lado_Brazo,
+              A.Brazo_Asignado AS Numero_Brazo,
               D.DPI, D.Nombres, D.Apellidos, D.Estatura_Hombro_cm,
-              T.Numero_Recibo, T.Codigo_Validacion_Recibo
+              A.Codigo_Verificacion AS Codigo_Validacion_Recibo
        FROM Asignacion_Turno A
        INNER JOIN Devoto D ON A.ID_Devoto = D.ID_Devoto
-       LEFT JOIN Transaccion_Financiera T ON T.ID_Devoto = D.ID_Devoto AND T.Concepto_Descripcion LIKE '%' || A.Numero_Turno || '%'
        WHERE A.ID_Anda = ? AND A.Anio_Cuaresma = ?
-       ORDER BY A.Numero_Turno ASC, A.Lado_Brazo ASC, A.Numero_Brazo ASC`,
+       ORDER BY A.Numero_Turno ASC, A.Brazo_Asignado ASC`,
       [idAnda, anioCuaresma]
     );
   },
