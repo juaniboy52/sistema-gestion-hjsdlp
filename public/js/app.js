@@ -469,37 +469,74 @@ async function manejarRegistroDevoto(e) {
 
 // 4. Operaciones de Caja
 async function cargarSelectDevotos() {
-  const select = document.getElementById('cobro-devoto-select') || document.getElementById('devoto-select');
-  if (!select) return;
-  const res = await fetch(`${API_URL}/devotos`);
-  const data = await res.json();
-  select.innerHTML = '<option value="">Seleccione un cargador...</option>';
-  (data.devotos || []).forEach(d => {
-    select.innerHTML += `<option value="${d.ID_Devoto}">${d.Nombres} ${d.Apellidos} (${d.Estatura_Hombro_cm} cm)</option>`;
-  });
+  const selectDevoto = document.getElementById('cobro-devoto-select') || document.getElementById('devoto-select');
+  const selectAnda = document.getElementById('cobro-anda-select');
+
+  if (selectDevoto) {
+    try {
+      const res = await fetch(`${API_URL}/devotos`);
+      const data = await res.json();
+      selectDevoto.innerHTML = '<option value="">Seleccione un cargador...</option>';
+      (data.devotos || []).forEach(d => {
+        selectDevoto.innerHTML += `<option value="${d.ID_Devoto}">${d.Nombres} ${d.Apellidos} (${d.Estatura_Hombro_cm} cm)</option>`;
+      });
+    } catch (err) {
+      console.error('Error cargando devotos:', err);
+    }
+  }
+
+  if (selectAnda) {
+    try {
+      const res = await fetchAutenticado('/andas');
+      const data = await res.json();
+      selectAnda.innerHTML = '<option value="">Seleccione el Anda...</option>';
+      const andas = data.andas || [];
+      andas.filter(a => a.Estado_Activo === 1 || a.Estado_Activo === undefined).forEach(a => {
+        selectAnda.innerHTML += `<option value="${a.ID_Anda}">${a.Nombre_Anda} (${a.Cantidad_Brazos} brazos - ${a.Cantidad_Turnos} turnos)</option>`;
+      });
+    } catch (err) {
+      console.error('Error cargando andas en caja:', err);
+    }
+  }
 }
 
-async function manejarAsignarTurno(e) {
+async function manejarCobroTurno(e) {
   e.preventDefault();
-  const idDevoto = document.getElementById('turno-devoto-select').value;
-  const numeroTurno = parseInt(document.getElementById('turno-numero').value, 10);
-  const ladoBrazo = document.getElementById('turno-lado').value;
-  const numeroBrazo = parseInt(document.getElementById('turno-brazo').value, 10);
-  const montoQuetzales = parseFloat(document.getElementById('turno-monto').value);
+  const idDevoto = document.getElementById('cobro-devoto-select')?.value;
+  const idAnda = document.getElementById('cobro-anda-select')?.value;
+  const montoQuetzales = parseFloat(document.getElementById('cobro-cuota')?.value || '50.00');
 
-  const res = await fetchAutenticado('/turnos/asignar', {
-    method: 'POST',
-    body: JSON.stringify({ idDevoto, numeroTurno, ladoBrazo, numeroBrazo, montoQuetzales })
-  });
-  const data = await res.json();
-
-  if (!res.ok) {
-    alert(data.mensaje || 'Error al asignar turno');
+  if (!idDevoto || !idAnda) {
+    alert('Por favor selecciona tanto el cargador como el anda procesional.');
     return;
   }
 
-  alert(`Turno asignado con éxito. Recibo emitido: ${data.comprobante.numeroRecibo}`);
+  try {
+    const res = await fetchAutenticado('/finanzas/cobro-inscripcion', {
+      method: 'POST',
+      body: JSON.stringify({ idDevoto, idAnda, montoQuetzales })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.mensaje || 'Error al procesar el cobro');
+      return;
+    }
+
+    alert(data.mensaje);
+    if (data.comprobante) {
+      generarReciboInscripcionPDF(data.comprobante);
+    }
+    document.getElementById('form-cobro-turno')?.reset();
+    if (typeof cargarMisCobrosDia === 'function') cargarMisCobrosDia();
+    cargarSelectDevotos();
+  } catch (err) {
+    console.error('Error en cobro de turno:', err);
+    alert('Error de conexión al procesar el cobro.');
+  }
 }
+async function manejarAsignarTurno(e) { return manejarCobroTurno(e); }
+
 
 async function manejarOfrenda(e) {
   e.preventDefault();
@@ -1590,3 +1627,43 @@ function generarComprobanteEgresoPDF(egreso) {
   }
 }
 window.generarComprobanteEgresoPDF = generarComprobanteEgresoPDF;
+
+
+// Función global para desactivar/activar Anda desde el Visualizador
+window.confirmarDesactivarAnda = async function() {
+  const selectAnda = document.getElementById('select-anda-visualizar');
+  const idAnda = selectAnda ? selectAnda.value : null;
+
+  if (!idAnda) {
+    alert('Por favor selecciona un anda procesional primero.');
+    return;
+  }
+
+  const nombreTexto = selectAnda.options[selectAnda.selectedIndex]?.text || 'el anda seleccionada';
+  if (!confirm(`¿Estás seguro de que deseas cambiar el estado (activar/desactivar) de: "${nombreTexto}"?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetchAutenticado(`/andas/${idAnda}/estado`, {
+      method: 'PATCH'
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.mensaje || 'Error al cambiar el estado del anda');
+      return;
+    }
+
+    alert(data.mensaje || 'Estado del anda actualizado correctamente');
+
+    if (typeof cargarAndasDisponibles === 'function') await cargarAndasDisponibles();
+    if (typeof cargarSelectDevotos === 'function') await cargarSelectDevotos();
+    if (typeof cambiarAndaVisualizador === 'function') {
+      cambiarAndaVisualizador(idAnda);
+    }
+  } catch (err) {
+    console.error('Error al cambiar estado del anda:', err);
+    alert('Error de conexión al intentar cambiar el estado del anda.');
+  }
+};

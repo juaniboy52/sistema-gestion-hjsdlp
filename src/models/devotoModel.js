@@ -15,8 +15,8 @@ const DevotoModel = {
   async create(data) {
     const { dpi, nombres, apellidos, telefono, correo, estaturaHombroCm } = data;
     await runQuery(
-      `INSERT INTO Devoto (DPI, Nombres, Apellidos, Telefono, Correo_Electronico, Estatura_Hombro_cm)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO Devoto (CUI, Nombres, Apellidos, Telefono, Email, Direccion, Altura, ID_Comision, ID_Anda, Estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO')`,
       [dpi, nombres, apellidos, telefono, correo, estaturaHombroCm]
     );
     return await this.findByDPI(dpi);

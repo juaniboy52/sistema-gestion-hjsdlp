@@ -2,6 +2,100 @@ const { runQuery, getQuery, allQuery } = require('../config/database');
 const crypto = require('crypto');
 
 const FinanzasController = {
+  // POST /api/finanzas/cobro-turno (Inscripción a Anda)
+  async registrarCobroInscripcion(req, res) {
+    try {
+      const {
+        idDevoto,
+        idAnda,
+        montoQuetzales = 50.00,
+        metodoPago = 'Efectivo',
+        anioCuaresma = 2026
+      } = req.body;
+
+      const idUsuarioCajero = req.usuario ? req.usuario.idUsuario : 1;
+
+      if (!idDevoto || !idAnda) {
+        return res.status(400).json({ mensaje: 'Debe seleccionar el devoto y el anda procesional' });
+      }
+
+      const monto = parseFloat(montoQuetzales);
+      if (isNaN(monto) || monto <= 0) {
+        return res.status(400).json({ mensaje: 'El monto ingresado no es válido' });
+      }
+
+      // 1. Consultar devoto
+      const devoto = await getQuery(
+        'SELECT ID_Devoto, Nombres, Apellidos, DPI, Estatura_Hombro_cm FROM Devoto WHERE ID_Devoto = ?',
+        [idDevoto]
+      );
+      if (!devoto) {
+        return res.status(404).json({ mensaje: 'Devoto no encontrado' });
+      }
+
+      // 2. Consultar anda
+      const anda = await getQuery(
+        'SELECT ID_Anda, Nombre_Anda, Anio_Temporada FROM Configuracion_Anda WHERE ID_Anda = ?',
+        [idAnda]
+      );
+      if (!anda) {
+        return res.status(404).json({ mensaje: 'Anda procesional no encontrada' });
+      }
+
+      // 3. Validar si ya cuenta con inscripción pagada en esa anda este año
+      const yaInscrito = await getQuery(
+        'SELECT ID_Asignacion FROM Asignacion_Turno WHERE ID_Devoto = ? AND ID_Anda = ? AND Anio_Cuaresma = ?',
+        [idDevoto, idAnda, anioCuaresma]
+      );
+      if (yaInscrito) {
+        return res.status(409).json({
+          mensaje: `El devoto ${devoto.Nombres} ${devoto.Apellidos} ya se encuentra inscrito en ${anda.Nombre_Anda} para la temporada ${anioCuaresma}.`
+        });
+      }
+
+      const timestamp = Date.now().toString().slice(-6) + Math.floor(Math.random() * 10);
+      const numeroRecibo = `REC-${anioCuaresma}-${timestamp}`;
+      const codigoValidacion = crypto.randomBytes(16).toString('hex').toUpperCase();
+
+      // 4. Registrar inscripción en estado PAGADO (turno y brazo pendientes para algoritmo automático)
+      await runQuery(
+        `INSERT INTO Asignacion_Turno (
+          ID_Devoto, ID_Anda, Anio_Cuaresma, Numero_Turno, Brazo_Asignado, Codigo_Verificacion, Estado_Inscripcion, Fecha_Asignacion
+        ) VALUES (?, ?, ?, NULL, NULL, ?, 'PAGADO', CURRENT_TIMESTAMP)`,
+        [idDevoto, idAnda, anioCuaresma, codigoValidacion]
+      );
+
+      // 5. Registrar transacción financiera de ingreso
+      const concepto = `Inscripción Anda: ${anda.Nombre_Anda} - Temporada ${anioCuaresma}`;
+      await runQuery(
+        `INSERT INTO Transaccion_Financiera (
+          Numero_Recibo, ID_Usuario_Cajero, ID_Devoto, Tipo_Movimiento, Concepto_Descripcion, Monto_Quetzales, Metodo_Pago, Codigo_Validacion_Recibo
+        ) VALUES (?, ?, ?, 'Ingreso', ?, ?, ?, ?)`,
+        [numeroRecibo, idUsuarioCajero, idDevoto, concepto, monto, metodoPago, codigoValidacion]
+      );
+
+      return res.status(201).json({
+        mensaje: `Inscripción registrada y cobrada con éxito para ${anda.Nombre_Anda}`,
+        comprobante: {
+          numeroRecibo,
+          fecha: new Date().toISOString(),
+          devoto: `${devoto.Nombres} ${devoto.Apellidos}`,
+          dpi: devoto.DPI || 'N/A',
+          estatura: devoto.Estatura_Hombro_cm || 0,
+          anda: anda.Nombre_Anda,
+          concepto,
+          montoQuetzales: monto,
+          metodoPago,
+          codigoValidacion,
+          estadoAsignacion: 'PENDIENTE DE ASIGNACIÓN AUTOMÁTICA POR ESTATURA'
+        }
+      });
+    } catch (error) {
+      console.error('Error al registrar cobro de inscripción:', error);
+      return res.status(500).json({ mensaje: 'Error interno al registrar cobro de inscripción' });
+    }
+  },
+
   // POST /api/finanzas/ofrenda
   async registrarOfrenda(req, res) {
     try {

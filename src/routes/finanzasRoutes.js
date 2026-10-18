@@ -4,6 +4,9 @@ const FinanzasController = require('../controllers/finanzasController');
 const { verificarToken, permitirRoles } = require('../middlewares/authMiddleware');
 
 // Permitir Roles 1 (Admin), 2 (Secretaría), 3 (Tesorero) y 5 (Cajero)
+// Cobro de inscripción a Anda (Cajero, Secretaría, Admin)
+router.post('/cobro-inscripcion', verificarToken, permitirRoles(1, 2, 3, 5), FinanzasController.registrarCobroInscripcion);
+
 router.post('/ofrenda', verificarToken, permitirRoles(1, 2, 3, 5), FinanzasController.registrarOfrenda);
 
 // Exclusivo Tesorería y Admin (el Cajero queda bloqueado)
