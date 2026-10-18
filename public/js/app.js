@@ -101,6 +101,30 @@ window.guardarDatosAnda = async function(e) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      intentosFallidosLogin++;
+      if (intentosFallidosLogin >= 5) {
+        loginBloqueadoHasta = Date.now() + 30000; // 30 segundos
+        intentosFallidosLogin = 0;
+        if (alerta) {
+          alerta.textContent = "Has superado los 5 intentos. Espera 30 segundos para volver a intentar.";
+          alerta.classList.remove("d-none");
+        }
+        const btnLogin = document.querySelector("#modalLogin button[type='submit']");
+        if (btnLogin) {
+          btnLogin.disabled = true;
+          let tiempoRestante = 30;
+          const intervalo = setInterval(() => {
+            tiempoRestante--;
+            btnLogin.textContent = `Espera (${tiempoRestante}s)`;
+            if (tiempoRestante <= 0) {
+              clearInterval(intervalo);
+              btnLogin.disabled = false;
+              btnLogin.textContent = "INGRESAR AL SISTEMA";
+              if (alerta) alerta.classList.add("d-none");
+            }
+          }, 1000);
+        }
+      }
       throw new Error(data.mensaje || data.error || ("Error HTTP " + res.status));
     }
 
@@ -215,31 +239,86 @@ function navegarA(vistaId) {
 }
 
 // 2. Autenticación y Cierre de Sesión
+
+let intentosFallidosLogin = 0;
+let loginBloqueadoHasta = 0;
+
 async function manejarLogin(e) {
   e.preventDefault();
-  const correoEl = document.getElementById('login-correo');
-  const passEl = document.getElementById('login-password');
-  const alerta = document.getElementById('login-alerta');
+  const ahora = Date.now();
+  const alerta = document.getElementById("login-alerta");
+  const btnLogin = document.querySelector("#modalLogin button[type='submit']");
 
-  const correo = correoEl ? correoEl.value.trim() : '';
-  const password = passEl ? passEl.value : '';
+  // 1. Validar si el usuario está en tiempo de espera (cooldown)
+  if (ahora < loginBloqueadoHasta) {
+    const segundosRestantes = Math.ceil((loginBloqueadoHasta - ahora) / 1000);
+    if (alerta) {
+      alerta.textContent = `Demasiados intentos fallidos. Espera ${segundosRestantes} segundos.`;
+      alerta.classList.remove("d-none");
+    }
+    return;
+  }
+
+  const correoEl = document.getElementById("login-correo");
+  const passEl = document.getElementById("login-password");
+  const correo = correoEl ? correoEl.value.trim() : "";
+  const password = passEl ? passEl.value : "";
 
   try {
     const res = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ correo, password })
     });
     const data = await res.json();
 
     if (!res.ok) {
-      if (alerta) {
-        alerta.textContent = data.mensaje || 'Credenciales incorrectas';
-        alerta.classList.remove('d-none');
+      if (correoEl) { correoEl.value = ""; correoEl.focus(); }
+      if (passEl) { passEl.value = ""; }
+
+      intentosFallidosLogin++;
+
+      if (intentosFallidosLogin >= 5) {
+        loginBloqueadoHasta = Date.now() + 30000; // 30 segundos
+        intentosFallidosLogin = 0;
+
+        if (alerta) {
+          alerta.textContent = "Has superado los 5 intentos. Espera 30 segundos para volver a intentar.";
+          alerta.classList.remove("d-none");
+        }
+
+        if (btnLogin) {
+          btnLogin.disabled = true;
+          let tiempoRestante = 30;
+          const intervalo = setInterval(() => {
+            tiempoRestante--;
+            btnLogin.textContent = `Espera (${tiempoRestante}s)`;
+            if (tiempoRestante <= 0) {
+              clearInterval(intervalo);
+              btnLogin.disabled = false;
+              btnLogin.textContent = "INGRESAR AL SISTEMA";
+              if (alerta) alerta.classList.add("d-none");
+            }
+          }, 1000);
+        }
       } else {
-        alert(data.mensaje || 'Credenciales incorrectas');
+        const intentosRestantes = 5 - intentosFallidosLogin;
+        if (alerta) {
+          alerta.textContent = `${data.mensaje || "Credenciales incorrectas"}. Te quedan ${intentosRestantes} intento(s).`;
+          alerta.classList.remove("d-none");
+        } else {
+          alert(data.mensaje || "Credenciales incorrectas");
+        }
       }
       return;
+    }
+
+    // Login exitoso: restablecer contadores
+    intentosFallidosLogin = 0;
+    loginBloqueadoHasta = 0;
+    if (btnLogin) {
+      btnLogin.disabled = false;
+      btnLogin.textContent = "INGRESAR AL SISTEMA";
     }
 
     tokenActual = data.token;
@@ -470,6 +549,7 @@ async function manejarEgreso(e) {
   }
 
   alert(`Egreso liquidado con éxito. Comprobante: ${data.comprobanteEgreso.numeroComprobante}\nSaldo restante en caja: ${data.comprobanteEgreso.saldoRestanteEnCaja}`);
+  if (data.comprobanteEgreso) generarComprobanteEgresoPDF(data.comprobanteEgreso);
   document.getElementById('form-egreso').reset();
 }
 
@@ -1423,3 +1503,90 @@ window.alternarEstadoEnser = async function(id, nuevoEstado) {
     alert('Error al comunicar con el servidor para cambiar estado');
   }
 };
+
+// --- MÓDULO SEGURO DE COMPROBANTE DE EGRESO (NO MODIFICA OTRAS FUNCIONES) ---
+function generarComprobanteEgresoPDF(egreso) {
+  const monto = typeof egreso.montoDesembolsado === 'string'
+    ? egreso.montoDesembolsado.replace('Q', '').trim()
+    : (egreso.montoQuetzales || egreso.monto || 0);
+
+  const contenido = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Vale de Caja - ${egreso.numeroComprobante || 'Egreso'}</title>
+      <style>
+        body { font-family: 'Courier New', Courier, monospace; margin: 20px; color: #222; }
+        .ticket { border: 2px dashed #b02a37; padding: 25px; max-width: 440px; margin: auto; border-radius: 8px; }
+        .encabezado { text-align: center; border-bottom: 2px solid #b02a37; padding-bottom: 12px; margin-bottom: 15px; }
+        .encabezado h2 { margin: 0; color: #4b164c; font-size: 19px; text-transform: uppercase; }
+        .encabezado p { margin: 3px 0; font-size: 12px; color: #666; }
+        .badge { display: inline-block; background: #b02a37; color: white; padding: 3px 8px; font-size: 11px; font-weight: bold; margin-top: 4px; }
+        .detalle { font-size: 13px; line-height: 1.6; }
+        .detalle-fila { display: flex; justify-content: space-between; margin: 4px 0; }
+        .monto-total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 8px; color: #b02a37; }
+        .firmas { margin-top: 40px; display: flex; justify-content: space-between; gap: 15px; }
+        .col-firma { width: 48%; text-align: center; font-size: 10px; }
+        .linea-firma { border-top: 1px solid #444; margin-bottom: 4px; }
+        .btn-imprimir { display: block; width: 100%; padding: 10px; margin-top: 20px; background: #b02a37; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        @media print { .btn-imprimir { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+        <div class="encabezado">
+          <h2>Hermandad de la Paz</h2>
+          <p>Consagrada Imagen de Jesús Sepultado</p>
+          <p>Cuaresma y Semana Santa 2026</p>
+          <div class="badge">VALE DE CAJA / COMPROBANTE DE EGRESO</div>
+        </div>
+        <div class="detalle">
+          <div class="detalle-fila"><span><strong>No. Vale:</strong></span><span>${egreso.numeroComprobante || 'N/A'}</span></div>
+          <div class="detalle-fila"><span><strong>Fecha:</strong></span><span>${egreso.fecha ? new Date(egreso.fecha).toLocaleString() : new Date().toLocaleString()}</span></div>
+          <div class="detalle-fila"><span><strong>Beneficiario:</strong></span><span>${egreso.beneficiario || 'N/A'}</span></div>
+          <div class="detalle-fila"><span><strong>Encargado:</strong></span><span>${egreso.encargadoGasto || 'Comisión de Finanzas'}</span></div>
+          <div class="detalle-fila"><span><strong>Categoría:</strong></span><span>${egreso.categoria || 'Gasto Operativo'}</span></div>
+          <div class="detalle-fila"><span><strong>Concepto:</strong></span><span>${egreso.concepto || 'Egreso de caja'}</span></div>
+          <div class="detalle-fila"><span><strong>Método Pago:</strong></span><span>${egreso.metodoPago || 'Efectivo'}</span></div>
+          ${egreso.codigoValidacion ? `<div class="detalle-fila" style="font-size:10px; color:#555;"><span><strong>Hash:</strong></span><span>${egreso.codigoValidacion.slice(0, 16)}...</span></div>` : ''}
+          <div class="monto-total">TOTAL: Q${parseFloat(monto).toFixed(2)}</div>
+        </div>
+        <div class="firmas">
+          <div class="col-firma">
+            <div class="linea-firma"></div>
+            <p>Entregué Conforme<br><strong>Tesorería / Caja</strong></p>
+          </div>
+          <div class="col-firma">
+            <div class="linea-firma"></div>
+            <p>Recibí Conforme<br><strong>Beneficiario</strong></p>
+          </div>
+        </div>
+        <button class="btn-imprimir" onclick="window.print()">Imprimir / Guardar en PDF</button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const ventana = window.open('', '_blank', 'width=620,height=750');
+  if (ventana) {
+    ventana.document.write(contenido);
+    ventana.document.close();
+  } else {
+    // Si el navegador bloquea la ventana emergente, creamos un overlay en la misma pestaña
+    let contenedor = document.getElementById('contenedor-impresion-vale');
+    if (!contenedor) {
+      contenedor = document.createElement('div');
+      contenedor.id = 'contenedor-impresion-vale';
+      contenedor.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); z-index:99999; display:flex; justify-content:center; align-items:center;';
+      document.body.appendChild(contenedor);
+    }
+    contenedor.innerHTML = `
+      <div style="background:#fff; border-radius:8px; padding:20px; max-height:90vh; overflow-y:auto; position:relative;">
+        <button onclick="document.body.removeChild(document.getElementById('contenedor-impresion-vale'))" style="position:absolute; top:10px; right:15px; border:none; background:#ccc; border-radius:50%; width:28px; height:28px; font-weight:bold; cursor:pointer;">✕</button>
+        ${contenido}
+      </div>
+    `;
+  }
+}
+window.generarComprobanteEgresoPDF = generarComprobanteEgresoPDF;
