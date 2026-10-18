@@ -2,6 +2,91 @@ const { runQuery, getQuery, allQuery } = require('../config/database');
 const crypto = require('crypto');
 
 const FinanzasController = {
+  // GET /api/finanzas/transacciones (Historial enriquecido para Admin y Tesorero)
+  async listarTransacciones(req, res) {
+    try {
+      const { fechaInicio, fechaFin, tipo, buscar } = req.query;
+
+      let condiciones = [];
+      let params = [];
+
+      // Filtro por tipo de movimiento (Ingreso / Egreso)
+      if (tipo && (tipo === 'Ingreso' || tipo === 'Egreso')) {
+        condiciones.push('T.Tipo_Movimiento = ?');
+        params.push(tipo);
+      }
+
+      // Filtro por rango de fechas
+      if (fechaInicio) {
+        condiciones.push('DATE(T.Fecha_Transaccion) >= DATE(?)');
+        params.push(fechaInicio);
+      }
+      if (fechaFin) {
+        condiciones.push('DATE(T.Fecha_Transaccion) <= DATE(?)');
+        params.push(fechaFin);
+      }
+
+      // Filtro por texto (No. Recibo, Devoto o Encargado del gasto)
+      if (buscar && buscar.trim() !== '') {
+        const termino = `%${buscar.trim()}%`;
+        condiciones.push(`(
+          T.Numero_Recibo LIKE ? OR
+          T.Encargado_Gasto LIKE ? OR
+          T.Concepto_Descripcion LIKE ? OR
+          (D.Nombres || ' ' || D.Apellidos) LIKE ? OR
+          D.DPI LIKE ?
+        )`);
+        params.push(termino, termino, termino, termino, termino);
+      }
+
+      const whereClause = condiciones.length > 0 ? 'WHERE ' + condiciones.join(' AND ') : '';
+
+      // Consulta con cruce a Devoto, Cajero, Asignación y Anda Procesional
+      const query = `
+        SELECT 
+          T.ID_Transaccion,
+          T.Numero_Recibo,
+          T.Tipo_Movimiento,
+          T.Concepto_Descripcion,
+          T.Monto_Quetzales,
+          T.Metodo_Pago,
+          T.Codigo_Validacion_Recibo,
+          T.Encargado_Gasto,
+          T.Fecha_Transaccion,
+          U.Nombres AS Cajero_Nombres,
+          U.Apellidos AS Cajero_Apellidos,
+          D.ID_Devoto,
+          D.DPI AS Devoto_DPI,
+          D.Nombres AS Devoto_Nombres,
+          D.Apellidos AS Devoto_Apellidos,
+          D.Estatura_Hombro_cm AS Devoto_Estatura,
+          CA.ID_Anda,
+          CA.Nombre_Anda,
+          A.Numero_Turno,
+          A.Brazo_Asignado,
+          A.Estado_Inscripcion
+        FROM Transaccion_Financiera T
+        LEFT JOIN Usuario U ON T.ID_Usuario_Cajero = U.ID_Usuario
+        LEFT JOIN Devoto D ON T.ID_Devoto = D.ID_Devoto
+        LEFT JOIN Asignacion_Turno A ON T.Codigo_Validacion_Recibo = A.Codigo_Verificacion
+        LEFT JOIN Configuracion_Anda CA ON A.ID_Anda = CA.ID_Anda
+        ${whereClause}
+        ORDER BY T.Fecha_Transaccion DESC, T.ID_Transaccion DESC
+        LIMIT 200
+      `;
+
+      const transacciones = await allQuery(query, params);
+
+      return res.status(200).json({
+        total: transacciones.length,
+        transacciones
+      });
+    } catch (error) {
+      console.error('Error al listar transacciones financieras:', error);
+      return res.status(500).json({ mensaje: 'Error al consultar historial de transacciones' });
+    }
+  },
+
   // POST /api/finanzas/cobro-turno (Inscripción a Anda)
   async registrarCobroInscripcion(req, res) {
     try {

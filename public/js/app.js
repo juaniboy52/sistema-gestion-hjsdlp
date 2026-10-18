@@ -646,48 +646,249 @@ async function cargarDistribucionAnda() {
 }
 
 // 6. Reportes
-async function cargarReportes() {
-  const res = await fetchAutenticado('/reportes/financiero');
-  const data = await res.json();
-  
-  if (data.totales) {
-    document.getElementById('card-ingresos').textContent = `Q ${(data.totales.Total_Ingresos_Q || 0).toFixed(2)}`;
-    document.getElementById('card-egresos').textContent = `Q ${(data.totales.Total_Egresos_Q || 0).toFixed(2)}`;
-    document.getElementById('card-saldo').textContent = `Q ${(data.totales.Balance_Neto_Q || 0).toFixed(2)}`;
-  }
 
-  const tbody = document.getElementById('tabla-movimientos-body');
-  tbody.innerHTML = '';
+// Variable global para almacenar temporalmente las transacciones consultadas
+window.transaccionesActuales = [];
 
-  if (!data.movimientos || data.movimientos.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No hay movimientos registrados</td></tr>';
+function limpiarFiltrosReportes() {
+  const b = document.getElementById('filtro-reporte-buscar');
+  const t = document.getElementById('filtro-reporte-tipo');
+  const d = document.getElementById('filtro-reporte-desde');
+  const h = document.getElementById('filtro-reporte-hasta');
+  if (b) b.value = '';
+  if (t) t.value = '';
+  if (d) d.value = '';
+  if (h) h.value = '';
+  cargarReportes();
+}
+
+// Plantilla PDF para Comprobantes de Egreso (Gasto)
+function generarComprobanteEgresoPDF(egreso) {
+  const v = window.open('', '_blank', 'width=620,height=750');
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Comprobante de Egreso - ${egreso.Numero_Recibo || 'Comprobante'}</title>
+      <style>
+        body { font-family: 'Courier New', Courier, monospace; margin: 20px; color: #111; }
+        .ticket { border: 2px dashed #b02a37; padding: 25px; max-width: 480px; margin: auto; border-radius: 8px; }
+        .encabezado { text-align: center; border-bottom: 2px solid #b02a37; padding-bottom: 12px; margin-bottom: 15px; }
+        .encabezado h2 { margin: 0; color: #b02a37; font-size: 19px; text-transform: uppercase; }
+        .encabezado p { margin: 3px 0; font-size: 12px; color: #555; }
+        .titulo-doc { font-size: 14px; font-weight: bold; margin-top: 6px; color: #dc3545; text-transform: uppercase; }
+        .detalle { font-size: 13px; line-height: 1.6; }
+        .fila { display: flex; justify-content: space-between; margin: 4px 0; }
+        .gasto-box { background: #fdf2f2; border-left: 4px solid #dc3545; padding: 8px 10px; margin: 12px 0; border-radius: 4px; }
+        .monto { text-align: right; font-size: 18px; font-weight: bold; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 8px; color: #dc3545; }
+        .firmas { display: flex; justify-content: space-between; margin-top: 45px; text-align: center; font-size: 11px; }
+        .firma-col { width: 45%; }
+        .linea { border-top: 1px solid #444; margin-bottom: 5px; }
+        .btn-print { display: block; width: 100%; padding: 10px; margin-top: 25px; background: #b02a37; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        @media print { .btn-print { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+        <div class="encabezado">
+          <h2>Hermandad de la Paz</h2>
+          <p>Consagrada Imagen de Jesús Sepultado</p>
+          <p>Tesorería General - Ejercicio Fiscal 2026</p>
+          <div class="titulo-doc">COMPROBANTE DE DESEMBOLSO / EGRESO</div>
+        </div>
+        <div class="detalle">
+          <div class="fila"><span><strong>No. Póliza / Recibo:</strong></span><span style="font-weight:bold;">${egreso.Numero_Recibo}</span></div>
+          <div class="fila"><span><strong>Fecha y Hora:</strong></span><span>${new Date(egreso.Fecha_Transaccion).toLocaleString()}</span></div>
+          <div class="fila"><span><strong>Entregado a (Beneficiario):</strong></span><span>${egreso.Encargado_Gasto || 'N/A'}</span></div>
+          <div class="fila"><span><strong>Método de Desembolso:</strong></span><span>${egreso.Metodo_Pago || 'Efectivo'}</span></div>
+          <div class="gasto-box">
+            <strong>CONCEPTO / DESTINO DEL GASTO:</strong><br>
+            <span>${egreso.Concepto_Descripcion}</span>
+          </div>
+          <div class="monto">VALOR DESEMBOLSADO: Q ${parseFloat(egreso.Monto_Quetzales).toFixed(2)}</div>
+          <div class="fila" style="margin-top: 12px; font-size: 10px; color: #777;">
+            <span>Código Fiscal Interno:</span><span>${egreso.Codigo_Validacion_Recibo || 'N/A'}</span>
+          </div>
+        </div>
+        <div class="firmas">
+          <div class="firma-col">
+            <div class="linea"></div>
+            Autorizado por<br>Tesorería / Presidencia
+          </div>
+          <div class="firma-col">
+            <div class="linea"></div>
+            Recibí Conforme<br>${egreso.Encargado_Gasto || 'Encargado'}
+          </div>
+        </div>
+        <button class="btn-print" onclick="window.print()">IMPRIMIR COMPROBANTE</button>
+      </div>
+    </body>
+    </html>
+  `;
+  v.document.write(html);
+  v.document.close();
+}
+
+// Router para reimprimir según el tipo de movimiento y contenido
+function reimprimirComprobantePorId(idTransaccion) {
+  const t = (window.transaccionesActuales || []).find(x => x.ID_Transaccion === idTransaccion);
+  if (!t) {
+    alert('No se encontraron los datos del comprobante.');
     return;
   }
 
-  data.movimientos.forEach(m => {
-    const esIngreso = m.Tipo_Movimiento === 'Ingreso';
-    tbody.innerHTML += `
-      <tr>
-        <td><span class="badge bg-light text-dark font-monospace">${m.Numero_Recibo}</span></td>
-        <td class="small text-muted">${m.Fecha_Transaccion}</td>
-        <td>
-          <span class="badge ${esIngreso ? 'bg-success' : 'bg-danger'}">
-            ${m.Tipo_Movimiento}
-          </span>
-        </td>
-        <td class="small">
-          <div class="fw-semibold">${m.Concepto_Descripcion}</div>
-          ${m.Devoto_Asociado !== 'N/A' ? `<span class="text-muted">Devoto: ${m.Devoto_Asociado}</span>` : ''}
-        </td>
-        <td class="small">${m.Nombre_Cajero}</td>
-        <td><span class="badge bg-secondary">${m.Metodo_Pago}</span></td>
-        <td class="text-end fw-bold ${esIngreso ? 'text-success' : 'text-danger'}">
-          ${esIngreso ? '+' : '-'} Q ${parseFloat(m.Monto_Quetzales).toFixed(2)}
-        </td>
-      </tr>
-    `;
-  });
+  if (t.Tipo_Movimiento === 'Egreso') {
+    // Extraer datos si vienen empaquetados en Concepto_Descripcion
+    let beneficiario = t.Encargado_Gasto || 'N/A';
+    let categoria = 'Gasto Operativo';
+    let conceptoLimpio = t.Concepto_Descripcion || 'Egreso de caja';
+
+    const matchProv = conceptoLimpio.match(/PROVEEDOR:s*([^|]]+)/i);
+    if (matchProv) beneficiario = matchProv[1].trim();
+
+    const matchCat = conceptoLimpio.match(/CATEGORIA:s*([^|]]+)/i);
+    if (matchCat) categoria = matchCat[1].trim();
+
+    const matchDet = conceptoLimpio.match(/Detalle:s*([^|]]+)/i);
+    if (matchDet) conceptoLimpio = matchDet[1].trim();
+
+    const egresoMapeado = {
+      numeroComprobante: t.Numero_Recibo,
+      Numero_Recibo: t.Numero_Recibo,
+      fecha: t.Fecha_Transaccion,
+      Fecha_Transaccion: t.Fecha_Transaccion,
+      beneficiario: beneficiario,
+      encargadoGasto: t.Encargado_Gasto || 'Comisión de Finanzas',
+      categoria: categoria,
+      concepto: conceptoLimpio,
+      Concepto_Descripcion: t.Concepto_Descripcion,
+      metodoPago: t.Metodo_Pago || 'Efectivo',
+      monto: parseFloat(t.Monto_Quetzales) || 0,
+      montoQuetzales: parseFloat(t.Monto_Quetzales) || 0,
+      Monto_Quetzales: parseFloat(t.Monto_Quetzales) || 0,
+      codigoValidacion: t.Codigo_Validacion_Recibo || ''
+    };
+
+    if (typeof generarComprobanteEgreso === 'function') {
+      generarComprobanteEgreso(egresoMapeado);
+    } else if (typeof generarComprobanteEgresoPDF === 'function') {
+      generarComprobanteEgresoPDF(egresoMapeado);
+    }
+  } else if (t.Nombre_Anda || (t.Concepto_Descripcion && t.Concepto_Descripcion.includes('Inscripción Anda:'))) {
+    generarReciboInscripcionPDF({
+      numeroRecibo: t.Numero_Recibo,
+      fecha: t.Fecha_Transaccion,
+      devoto: t.Devoto_Nombres ? `${t.Devoto_Nombres} ${t.Devoto_Apellidos}` : 'Devoto Cargador',
+      dpi: t.Devoto_DPI || 'N/A',
+      estatura: t.Devoto_Estatura || 0,
+      anda: t.Nombre_Anda || 'Cortejo Procesional',
+      concepto: t.Concepto_Descripcion,
+      montoQuetzales: parseFloat(t.Monto_Quetzales) || 0,
+      metodoPago: t.Metodo_Pago,
+      codigoValidacion: t.Codigo_Validacion_Recibo
+    });
+  } else {
+    generarReciboPDF({
+      numeroRecibo: t.Numero_Recibo,
+      fecha: t.Fecha_Transaccion,
+      donante: t.Devoto_Nombres ? `${t.Devoto_Nombres} ${t.Devoto_Apellidos}` : 'Fiel Bienhechor',
+      concepto: t.Concepto_Descripcion,
+      montoQuetzales: parseFloat(t.Monto_Quetzales) || 0,
+      metodoPago: t.Metodo_Pago
+    });
+  }
 }
+window.reimprimirComprobantePorId = reimprimirComprobantePorId;
+
+window.limpiarFiltrosReportes = limpiarFiltrosReportes;
+
+// 6. Reportes Contables con Filtros y Reimpresión
+async function cargarReportes() {
+  const buscar = document.getElementById('filtro-reporte-buscar')?.value || '';
+  const tipo = document.getElementById('filtro-reporte-tipo')?.value || '';
+  const desde = document.getElementById('filtro-reporte-desde')?.value || '';
+  const hasta = document.getElementById('filtro-reporte-hasta')?.value || '';
+
+  const params = new URLSearchParams();
+  if (buscar) params.append('buscar', buscar);
+  if (tipo) params.append('tipo', tipo);
+  if (desde) params.append('fechaInicio', desde);
+  if (hasta) params.append('fechaFin', hasta);
+
+  const url = `/finanzas/transacciones?${params.toString()}`;
+
+  try {
+    const res = await fetchAutenticado(url);
+    const data = await res.json();
+    const transacciones = data.transacciones || [];
+    window.transaccionesActuales = transacciones;
+
+    // Calcular balances en base a transacciones obtenidas
+    let totIngresos = 0;
+    let totEgresos = 0;
+
+    transacciones.forEach(m => {
+      const valor = parseFloat(m.Monto_Quetzales) || 0;
+      if (m.Tipo_Movimiento === 'Ingreso') totIngresos += valor;
+      else if (m.Tipo_Movimiento === 'Egreso') totEgresos += valor;
+    });
+
+    const cardIng = document.getElementById('card-ingresos');
+    const cardEgr = document.getElementById('card-egresos');
+    const cardSal = document.getElementById('card-saldo');
+
+    if (cardIng) cardIng.textContent = `Q ${totIngresos.toFixed(2)}`;
+    if (cardEgr) cardEgr.textContent = `Q ${totEgresos.toFixed(2)}`;
+    if (cardSal) cardSal.textContent = `Q ${(totIngresos - totEgresos).toFixed(2)}`;
+
+    const tbody = document.getElementById('tabla-movimientos-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (transacciones.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No se encontraron movimientos con los filtros seleccionados</td></tr>';
+      return;
+    }
+
+    transacciones.forEach(m => {
+      const esIngreso = m.Tipo_Movimiento === 'Ingreso';
+      const responsable = (m.Cajero_Nombres || '') + ' ' + (m.Cajero_Apellidos || '');
+      const persona = m.Tipo_Movimiento === 'Egreso' 
+        ? (m.Encargado_Gasto ? `<span class="badge bg-light text-danger border">A: ${m.Encargado_Gasto}</span>` : '')
+        : (m.Devoto_Nombres ? `<span class="badge bg-light text-success border">Devoto: ${m.Devoto_Nombres} ${m.Devoto_Apellidos}</span>` : '');
+
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="badge bg-light text-dark font-monospace border">${m.Numero_Recibo}</span></td>
+          <td class="small text-muted">${new Date(m.Fecha_Transaccion).toLocaleDateString()} ${new Date(m.Fecha_Transaccion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+          <td>
+            <span class="badge ${esIngreso ? 'bg-success' : 'bg-danger'}">
+              ${m.Tipo_Movimiento}
+            </span>
+          </td>
+          <td class="small">
+            <div class="fw-semibold">${m.Concepto_Descripcion}</div>
+            ${persona}
+          </td>
+          <td class="small text-muted">${responsable.trim() || 'Sistema'}</td>
+          <td><span class="badge bg-secondary">${m.Metodo_Pago || 'Efectivo'}</span></td>
+          <td class="text-end fw-bold ${esIngreso ? 'text-success' : 'text-danger'}">
+            ${esIngreso ? '+' : '-'} Q ${parseFloat(m.Monto_Quetzales).toFixed(2)}
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-morado py-0 px-2 fw-bold" title="Reimprimir Comprobante" onclick="reimprimirComprobantePorId(${m.ID_Transaccion})">
+              <i class="bi bi-printer"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+  } catch (err) {
+    console.error('Error al cargar reportes financieros:', err);
+  }
+}
+
 
 // 7. Gestión de Usuarios y Roles (Admin)
 async function cargarUsuarios() {
@@ -1579,7 +1780,7 @@ function generarComprobanteEgresoPDF(egreso) {
           <div class="badge">VALE DE CAJA / COMPROBANTE DE EGRESO</div>
         </div>
         <div class="detalle">
-          <div class="detalle-fila"><span><strong>No. Vale:</strong></span><span>${egreso.numeroComprobante || 'N/A'}</span></div>
+          <div class="detalle-fila"><span><strong>No. Vale:</strong></span><span>${egreso.numeroComprobante || egreso.Numero_Recibo || 'N/A'}</span></div>
           <div class="detalle-fila"><span><strong>Fecha:</strong></span><span>${egreso.fecha ? new Date(egreso.fecha).toLocaleString() : new Date().toLocaleString()}</span></div>
           <div class="detalle-fila"><span><strong>Beneficiario:</strong></span><span>${egreso.beneficiario || 'N/A'}</span></div>
           <div class="detalle-fila"><span><strong>Encargado:</strong></span><span>${egreso.encargadoGasto || 'Comisión de Finanzas'}</span></div>
@@ -1587,7 +1788,7 @@ function generarComprobanteEgresoPDF(egreso) {
           <div class="detalle-fila"><span><strong>Concepto:</strong></span><span>${egreso.concepto || 'Egreso de caja'}</span></div>
           <div class="detalle-fila"><span><strong>Método Pago:</strong></span><span>${egreso.metodoPago || 'Efectivo'}</span></div>
           ${egreso.codigoValidacion ? `<div class="detalle-fila" style="font-size:10px; color:#555;"><span><strong>Hash:</strong></span><span>${egreso.codigoValidacion.slice(0, 16)}...</span></div>` : ''}
-          <div class="monto-total">TOTAL: Q${parseFloat(monto).toFixed(2)}</div>
+          <div class="monto-total">TOTAL: Q${parseFloat(egreso.monto !== undefined ? egreso.monto : (egreso.montoQuetzales !== undefined ? egreso.montoQuetzales : (egreso.Monto_Quetzales || 0))).toFixed(2)}</div>
         </div>
         <div class="firmas">
           <div class="col-firma">

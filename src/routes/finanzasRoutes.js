@@ -13,6 +13,9 @@ router.post('/ofrenda', verificarToken, permitirRoles(1, 2, 3, 5), FinanzasContr
 router.post('/egreso', verificarToken, permitirRoles(1, 3), FinanzasController.registrarEgreso);
 
 // Reporte de cobros propios por día para Cajero (5) y Admin (1)
+// Historial de transacciones para Admin (1) y Tesorero (3)
+router.get('/transacciones', verificarToken, permitirRoles(1, 3), FinanzasController.listarTransacciones);
+
 router.get('/mis-cobros-dia', verificarToken, permitirRoles(1, 5), FinanzasController.misCobrosDelDia);
 
 module.exports = router;
