@@ -4,19 +4,27 @@ const AndaModel = {
   async listarTodas(soloActivas = true) {
     let sql = `
       SELECT 
-        ID_Anda,
-        Nombre_Anda,
-        Descripcion,
-        Cantidad_Brazos,
-        Cantidad_Turnos,
-        Anio_Temporada,
-        Estado_Activo
-      FROM Configuracion_Anda
+        CA.ID_Anda,
+        CA.Nombre_Anda,
+        CA.Descripcion,
+        CA.Cantidad_Brazos,
+        CA.Cantidad_Turnos,
+        CA.Anio_Temporada,
+        CA.Estado_Activo,
+        (CA.Cantidad_Brazos * CA.Cantidad_Turnos) AS Cupo_Maximo,
+        (
+          SELECT COUNT(*) 
+          FROM Asignacion_Turno A 
+          WHERE A.ID_Anda = CA.ID_Anda 
+            AND A.Anio_Cuaresma = CA.Anio_Temporada
+            AND A.Estado_Inscripcion = 'PAGADO'
+        ) AS Total_Inscritos
+      FROM Configuracion_Anda CA
     `;
     if (soloActivas) {
-      sql += ` WHERE Estado_Activo = 1`;
+      sql += ` WHERE CA.Estado_Activo = 1`;
     }
-    sql += ` ORDER BY ID_Anda ASC`;
+    sql += ` ORDER BY CA.ID_Anda ASC`;
     return await allQuery(sql);
   },
 

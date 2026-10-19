@@ -531,10 +531,53 @@
       <div class="card card-custom shadow-sm border-0 bg-white rounded-4">
         <div class="card-header-morado p-3 text-white rounded-top-4 d-flex justify-content-between align-items-center">
           <h5 class="mb-0 font-cinzel"><i class="bi bi-grid-3x3 me-2"></i>Visualizador de Andas Procesionales</h5>
-          <span class="badge bg-warning text-dark font-cinzel px-3 py-2" id="badge-total-brazos">40 Brazos</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info text-dark font-cinzel px-3 py-2" id="badge-cupo-inscritos">0 / 0 Inscritos</span>
+            <span class="badge bg-warning text-dark font-cinzel px-3 py-2" id="badge-total-brazos">40 Brazos</span>
+          </div>
         </div>
         <div class="card-body p-4 text-center">
           <p class="text-muted small mb-3" id="descripcion-cortejo-activa">Distribución de brazos y turnos procesionales</p>
+
+          <!-- PANEL DE CAPACIDAD Y DEVOTOS INSCRITOS -->
+          <div class="row g-2 mb-4 justify-content-center text-start" id="panel-estadisticas-anda">
+            <div class="col-md-4">
+              <div class="p-2 border rounded-3 bg-light d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 10px;">Devotos Inscritos</small>
+                  <span class="fs-5 fw-bold text-morado" id="stat-total-inscritos">0</span>
+                </div>
+                <i class="bi bi-person-check-fill fs-3 text-morado opacity-75"></i>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-2 border rounded-3 bg-light d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 10px;">Cupos Disponibles</small>
+                  <span class="fs-5 fw-bold text-success" id="stat-cupos-disponibles">0</span>
+                </div>
+                <i class="bi bi-people-fill fs-3 text-success opacity-75"></i>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-2 border rounded-3 bg-light d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 10px;">Capacidad Máxima</small>
+                  <span class="fs-5 fw-bold text-secondary" id="stat-capacidad-maxima">0</span>
+                </div>
+                <i class="bi bi-diagram-3-fill fs-3 text-secondary opacity-75"></i>
+              </div>
+            </div>
+            <div class="col-12 mt-2">
+              <div class="d-flex justify-content-between small text-muted mb-1">
+                <span>Porcentaje de Ocupación del Anda</span>
+                <span class="fw-bold" id="stat-porcentaje-texto">0%</span>
+              </div>
+              <div class="progress" style="height: 10px; border-radius: 6px;">
+                <div class="progress-bar bg-morado" id="stat-barra-progreso" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          </div>
 
           <div class="anda-plano-container p-4 mx-auto" style="max-width: 900px; background: #fafafa; border: 2px dashed #bfa15f; border-radius: 12px;">
             <div class="badge bg-dark px-4 py-2 mb-4 font-cinzel shadow-sm">▲ FRENTE DEL ANDA (Cabecera) ▲</div>

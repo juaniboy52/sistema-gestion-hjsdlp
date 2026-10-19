@@ -9,9 +9,46 @@ window.cambiarAndaVisualizador = function(idAnda) {
 
   const anda = (window.listaAndasGlobal || []).find(a => a.ID_Anda == idAnda);
   if (anda) {
+    const brazos = parseInt(anda.Cantidad_Brazos, 10) || 40;
+    const turnos = parseInt(anda.Cantidad_Turnos, 10) || 5;
+    const cupoMax = anda.Cupo_Maximo ? parseInt(anda.Cupo_Maximo, 10) : (brazos * turnos);
+    const totalInscritos = parseInt(anda.Total_Inscritos, 10) || 0;
+    const disponibles = Math.max(0, cupoMax - totalInscritos);
+    const porcentaje = cupoMax > 0 ? Math.min(100, Math.round((totalInscritos / cupoMax) * 100)) : 0;
+
+    // Badges en cabecera
     const badgeBrazos = document.getElementById("badge-total-brazos");
-    if (badgeBrazos) badgeBrazos.innerText = (anda.Cantidad_Brazos || 40) + " Brazos";
+    if (badgeBrazos) badgeBrazos.innerText = brazos + " Brazos (" + turnos + " Turnos)";
+
+    const badgeCupo = document.getElementById("badge-cupo-inscritos");
+    if (badgeCupo) {
+      badgeCupo.innerText = totalInscritos + " / " + cupoMax + " Inscritos";
+      badgeCupo.className = "badge font-cinzel px-3 py-2 " + (disponibles === 0 ? "bg-danger text-white" : "bg-info text-dark");
+    }
     
+    // Panel de métricas y barra de progreso
+    const statInscritos = document.getElementById("stat-total-inscritos");
+    if (statInscritos) statInscritos.innerText = totalInscritos;
+
+    const statDisponibles = document.getElementById("stat-cupos-disponibles");
+    if (statDisponibles) {
+      statDisponibles.innerText = disponibles;
+      statDisponibles.className = "fs-5 fw-bold " + (disponibles === 0 ? "text-danger" : "text-success");
+    }
+
+    const statMax = document.getElementById("stat-capacidad-maxima");
+    if (statMax) statMax.innerText = cupoMax;
+
+    const statPorc = document.getElementById("stat-porcentaje-texto");
+    if (statPorc) statPorc.innerText = porcentaje + "% ocupado";
+
+    const statBarra = document.getElementById("stat-barra-progreso");
+    if (statBarra) {
+      statBarra.style.width = porcentaje + "%";
+      statBarra.setAttribute("aria-valuenow", porcentaje);
+      statBarra.className = "progress-bar " + (porcentaje >= 100 ? "bg-danger" : (porcentaje >= 80 ? "bg-warning" : "bg-morado"));
+    }
+
     const desc = document.getElementById("descripcion-cortejo-activa");
     if (desc) desc.innerText = anda.Descripcion || ("Cortejo Procesional - Temporada " + (anda.Anio_Temporada || 2026));
 
