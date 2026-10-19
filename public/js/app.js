@@ -2567,3 +2567,181 @@ function generarReciboInscripcionPDF(comprobante) {
 }
 
 window.generarReciboInscripcionPDF = generarReciboInscripcionPDF;
+
+
+// ==========================================
+// MÓDULO INTERNO DE KARDEX Y AUDITORÍA
+// ==========================================
+let listaMovimientosKardexGlobal = [];
+
+window.alternarSubvistaEnseres = function(subvista) {
+  const catDiv = document.getElementById('subvista-enseres-catalogo');
+  const karDiv = document.getElementById('subvista-enseres-kardex');
+  const btnCat = document.getElementById('tab-catalogo-btn');
+  const btnKar = document.getElementById('tab-kardex-btn');
+
+  if (subvista === 'kardex') {
+    if (catDiv) catDiv.classList.add('d-none');
+    if (karDiv) karDiv.classList.remove('d-none');
+    if (btnCat) {
+      btnCat.classList.remove('active');
+      btnCat.classList.add('text-secondary');
+    }
+    if (btnKar) {
+      btnKar.classList.add('active');
+      btnKar.classList.remove('text-secondary');
+    }
+    cargarKardexGeneral();
+  } else {
+    if (karDiv) karDiv.classList.add('d-none');
+    if (catDiv) catDiv.classList.remove('d-none');
+    if (btnKar) {
+      btnKar.classList.remove('active');
+      btnKar.classList.add('text-secondary');
+    }
+    if (btnCat) {
+      btnCat.classList.add('active');
+      btnCat.classList.remove('text-secondary');
+    }
+  }
+};
+
+window.cargarKardexGeneral = async function() {
+  const tbody = document.getElementById('tabla-kardex-general-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando auditoría de Kardex...</td></tr>';
+
+  try {
+    const res = await fetchAutenticado('/enseres/kardex/todos');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    listaMovimientosKardexGlobal = data.movimientos || [];
+
+    // Poblar selector de filtro de artículos
+    const sel = document.getElementById('filtro-kardex-articulo');
+    if (sel && window.listaEnseresLocal) {
+      const valorPrevio = sel.value;
+      sel.innerHTML = '<option value="">Todos los artículos</option>' + 
+        window.listaEnseresLocal.map(a => `<option value="${a.ID_Enser}">${a.Nombre_Articulo}</option>`).join('');
+      sel.value = valorPrevio;
+    }
+
+    renderizarTablaKardexGeneral(listaMovimientosKardexGlobal);
+  } catch (err) {
+    console.error('Error al cargar kardex general:', err);
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error al cargar historial de movimientos.</td></tr>';
+  }
+};
+
+window.filtrarKardexPorArticulo = function(idEnser) {
+  if (!idEnser) {
+    renderizarTablaKardexGeneral(listaMovimientosKardexGlobal);
+  } else {
+    const filtrados = listaMovimientosKardexGlobal.filter(m => m.ID_Enser == idEnser);
+    renderizarTablaKardexGeneral(filtrados);
+  }
+};
+
+function renderizarTablaKardexGeneral(movs) {
+  const tbody = document.getElementById('tabla-kardex-general-body');
+  if (!tbody) return;
+
+  if (movs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No se registran movimientos en el Kardex.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = movs.map(m => {
+    const esEntrada = m.Tipo_Operacion === 'ENTRADA';
+    const badgeTipo = esEntrada 
+      ? '<span class="badge bg-success"><i class="bi bi-box-arrow-in-down me-1"></i>ENTRADA</span>'
+      : '<span class="badge bg-danger"><i class="bi bi-box-arrow-up me-1"></i>SALIDA</span>';
+    
+    const fecha = m.Fecha_Movimiento ? new Date(m.Fecha_Movimiento).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    const responsable = m.RegistradoPor || 'Usuario del Sistema';
+    const rol = m.Nombre_Rol ? `<span class="badge bg-light text-dark border ms-1" style="font-size: 11px;">${m.Nombre_Rol}</span>` : '';
+
+    return `
+      <tr>
+        <td class="small font-monospace">${fecha}</td>
+        <td class="fw-semibold text-morado">${m.Nombre_Articulo || ('Enser #' + m.ID_Enser)}</td>
+        <td>${badgeTipo}</td>
+        <td class="text-center fw-bold ${esEntrada ? 'text-success' : 'text-danger'}">${esEntrada ? '+' : '-'}${m.Cantidad}</td>
+        <td><span class="badge bg-secondary-subtle text-dark border">${m.Estado_Conservacion || 'Bueno'}</span></td>
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="bi bi-person-circle me-2 text-morado"></i>
+            <div>
+              <span class="fw-semibold small d-block">${responsable}</span>
+              ${rol}
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Historial individual por Artículo (Botón con reloj o desde fila)
+window.abrirHistorialKardex = async function(idEnser) {
+  const enser = (window.listaEnseresLocal || []).find(a => a.ID_Enser == idEnser);
+  const nombreArticulo = enser ? enser.Nombre_Articulo : ('Artículo #' + idEnser);
+  const stock = enser ? (enser.Total_Existencias ?? 0) : 0;
+
+  const tituloEl = document.getElementById('modal-kardex-titulo-articulo');
+  if (tituloEl) tituloEl.textContent = nombreArticulo;
+
+  const stockEl = document.getElementById('modal-kardex-stock-actual');
+  if (stockEl) stockEl.textContent = stock + ' unids';
+
+  const btnNuevo = document.getElementById('modal-btn-nuevo-movimiento');
+  if (btnNuevo) {
+    btnNuevo.onclick = () => {
+      const modalHist = bootstrap.Modal.getInstance(document.getElementById('modal-historial-kardex'));
+      if (modalHist) modalHist.hide();
+      abrirMovimientoKardex(idEnser, nombreArticulo, stock);
+    };
+  }
+
+  const tbody = document.getElementById('modal-tabla-kardex-body');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Cargando movimientos...</td></tr>';
+
+  const modalEl = document.getElementById('modal-historial-kardex');
+  if (modalEl && typeof bootstrap !== 'undefined') {
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  }
+
+  try {
+    const res = await fetchAutenticado('/enseres/' + idEnser + '/kardex');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const movs = data.movimientos || [];
+
+    if (!tbody) return;
+    if (movs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay movimientos registrados para este artículo.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = movs.map(m => {
+      const esEntrada = m.Tipo_Operacion === 'ENTRADA';
+      const fecha = m.Fecha_Movimiento ? new Date(m.Fecha_Movimiento).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      return `
+        <tr>
+          <td class="small font-monospace">${fecha}</td>
+          <td><span class="badge ${esEntrada ? 'bg-success' : 'bg-danger'}">${m.Tipo_Operacion}</span></td>
+          <td class="text-center fw-bold ${esEntrada ? 'text-success' : 'text-danger'}">${esEntrada ? '+' : '-'}${m.Cantidad}</td>
+          <td><span class="badge bg-light text-dark border">${m.Estado_Conservacion || 'Bueno'}</span></td>
+          <td class="small">
+            <strong>${m.RegistradoPor || 'Usuario'}</strong>
+            <small class="text-muted d-block">${m.Nombre_Rol || ''}</small>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error al cargar historial individual:', err);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Error al consultar el Kardex.</td></tr>';
+  }
+};

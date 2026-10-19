@@ -8,6 +8,7 @@ router.use(verificarToken);
 // Consulta y movimientos permitidos para Admin (1) y Enseres (4)
 router.get('/', permitirRoles(1, 4), EnseresController.listar);
 router.post('/kardex/movimiento', permitirRoles(1, 4), EnseresController.registrarMovimiento);
+router.get('/kardex/todos', permitirRoles(1, 4), EnseresController.verHistorial);
 router.get('/:idEnser/kardex', permitirRoles(1, 4), EnseresController.verHistorial);
 
 // Modificación y bajas exclusivo para Administradores (1)

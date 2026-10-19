@@ -740,15 +740,37 @@
     
     <!-- SECCIÓN: INVENTARIO DE ENSERES -->
     <section id="vista-enseres" class="seccion-spa d-none">
-      <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+      <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
         <div>
           <h3 class="font-cinzel text-morado fw-bold mb-0"><i class="bi bi-box-seam me-2"></i>Inventario de Enseres y Bienes</h3>
           <p class="text-muted small mb-0">Control de inventario, stock y movimientos de Kardex de la Hermandad</p>
         </div>
-        <button class="btn btn-morado text-white" onclick="abrirNuevoEnser()">
-          <i class="bi bi-plus-circle me-1"></i>Nuevo Artículo
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="alternarSubvistaEnseres('kardex')">
+            <i class="bi bi-journal-text me-1"></i>Ver Kardex General
+          </button>
+          <button class="btn btn-morado text-white" onclick="abrirNuevoEnser()">
+            <i class="bi bi-plus-circle me-1"></i>Nuevo Artículo
+          </button>
+        </div>
       </div>
+
+      <!-- PESTAÑAS DE NAVEGACIÓN INTERNA -->
+      <ul class="nav nav-pills mb-4 gap-2 p-1 bg-light rounded-3" id="pills-enseres" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-semibold" id="tab-catalogo-btn" onclick="alternarSubvistaEnseres('catalogo')">
+            <i class="bi bi-boxes me-1"></i>Catálogo de Enseres
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold text-secondary" id="tab-kardex-btn" onclick="alternarSubvistaEnseres('kardex')">
+            <i class="bi bi-clock-history me-1"></i>Auditoría y Kardex Detallado
+          </button>
+        </li>
+      </ul>
+
+      <!-- SUBVISTA 1: CATÁLOGO -->
+      <div id="subvista-enseres-catalogo">
 
       <div class="card shadow-sm border-0 rounded-4 mb-4">
         <div class="card-body p-4">
@@ -781,6 +803,47 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+      </div> <!-- Fin #subvista-enseres-catalogo -->
+
+      <!-- SUBVISTA 2: AUDITORÍA Y KARDEX DETALLADO -->
+      <div id="subvista-enseres-kardex" class="d-none">
+        <div class="card card-custom shadow-sm border-0 bg-white rounded-4 mb-4">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <div>
+                <h5 class="fw-bold text-morado font-cinzel mb-1"><i class="bi bi-journal-check me-2"></i>Historial de Movimientos de Kardex</h5>
+                <p class="text-muted small mb-0">Detalle de ingresos, salidas, responsables de los movimientos y conservación</p>
+              </div>
+              <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" id="filtro-kardex-articulo" style="min-width: 220px;" onchange="filtrarKardexPorArticulo(this.value)">
+                  <option value="">Todos los artículos</option>
+                </select>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cargarKardexGeneral()" title="Actualizar">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase">
+                  <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Artículo</th>
+                    <th>Tipo</th>
+                    <th class="text-center">Cantidad</th>
+                    <th>Estado / Detalle</th>
+                    <th>Responsable del Movimiento</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-kardex-general-body">
+                  <tr><td colspan="6" class="text-center text-muted py-4">Cargando movimientos de Kardex...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1354,5 +1417,48 @@
     </div>
   </div>
 
+
+  <!-- MODAL HISTORIAL KARDEX INDIVIDUAL -->
+  <div class="modal fade" id="modal-historial-kardex" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header card-header-morado text-white">
+          <h5 class="modal-title font-cinzel"><i class="bi bi-clock-history me-2"></i>Kardex: <span id="modal-kardex-titulo-articulo">Artículo</span></h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+            <div>
+              <span class="text-muted small d-block">Existencias actuales:</span>
+              <span class="fs-4 fw-bold text-morado" id="modal-kardex-stock-actual">0 unids</span>
+            </div>
+            <button class="btn btn-sm btn-morado text-white" id="modal-btn-nuevo-movimiento">
+              <i class="bi bi-plus-circle me-1"></i>Nuevo Movimiento
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light small text-uppercase">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Operación</th>
+                  <th class="text-center">Cantidad</th>
+                  <th>Conservación</th>
+                  <th>Responsable</th>
+                </tr>
+              </thead>
+              <tbody id="modal-tabla-kardex-body">
+                <tr><td colspan="5" class="text-center text-muted py-3">Cargando movimientos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-top-0">
+          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

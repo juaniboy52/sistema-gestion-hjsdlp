@@ -72,16 +72,40 @@ const EnseresModel = {
   },
 
   // Consultar historial Kardex
-  async obtenerHistorialKardex(idEnser) {
-    return await allQuery(
-      `SELECT K.ID_Movimiento, K.Tipo_Operacion, K.Cantidad, K.Estado_Conservacion, K.Fecha_Movimiento,
-              U.Nombres AS RegistradoPor
-       FROM Movimiento_Kardex K
-       INNER JOIN Usuario U ON K.ID_Usuario_Responsable = U.ID_Usuario
-       WHERE K.ID_Enser = ?
-       ORDER BY K.Fecha_Movimiento DESC`,
-      [idEnser]
-    );
+    // Consultar historial Kardex con datos del usuario responsable
+      async obtenerHistorialKardex(idEnser = null) {
+    let sql = `
+      SELECT 
+        K.ID_Movimiento,
+        K.ID_Enser,
+        COALESCE(C.Nombre_Articulo, 'Enser #' || K.ID_Enser) AS Nombre_Articulo,
+        K.Tipo_Operacion,
+        K.Cantidad,
+        COALESCE(K.Estado_Conservacion, 'Bueno') AS Estado_Conservacion,
+        K.Fecha_Movimiento,
+        TRIM(COALESCE(U.Nombres, 'Usuario') || ' ' || COALESCE(U.Apellidos, '')) AS RegistradoPor,
+        U.Correo_Institucional,
+        CASE 
+          WHEN U.ID_Rol = 1 THEN 'Administrador General'
+          WHEN U.ID_Rol = 2 THEN 'Secretaría'
+          WHEN U.ID_Rol = 3 THEN 'Tesorero'
+          WHEN U.ID_Rol = 4 THEN 'Enseres'
+          WHEN U.ID_Rol = 5 THEN 'Cajero'
+          ELSE 'Colaborador'
+        END AS Nombre_Rol
+      FROM Movimiento_Kardex K
+      LEFT JOIN Catalogo_Enseres C ON K.ID_Enser = C.ID_Enser
+      LEFT JOIN Usuario U ON K.ID_Usuario_Responsable = U.ID_Usuario
+    `;
+
+    const idNum = parseInt(idEnser, 10);
+    if (!isNaN(idNum) && idNum > 0) {
+      sql += ` WHERE K.ID_Enser = ? ORDER BY K.Fecha_Movimiento DESC, K.ID_Movimiento DESC`;
+      return await allQuery(sql, [idNum]);
+    }
+
+    sql += ` ORDER BY K.Fecha_Movimiento DESC, K.ID_Movimiento DESC`;
+    return await allQuery(sql);
   }
 };
 

@@ -130,19 +130,25 @@ const EnseresController = {
   },
 
   // GET /api/enseres/:idEnser/kardex (Admin y Enseres)
+    // GET /api/enseres/kardex/todos o GET /api/enseres/:idEnser/kardex
   async verHistorial(req, res) {
     try {
-      const { idEnser } = req.params;
-      const enser = await EnseresModel.findById(idEnser);
+      const idParam = req.params.idEnser;
+      const tieneIdValido = idParam && idParam !== 'todos' && !isNaN(parseInt(idParam, 10));
+      const idEnser = tieneIdValido ? parseInt(idParam, 10) : null;
 
-      if (!enser) {
-        return res.status(404).json({ mensaje: 'Artículo no encontrado' });
+      let articulo = null;
+      if (idEnser) {
+        articulo = await EnseresModel.findById(idEnser);
+        if (!articulo) {
+          return res.status(404).json({ mensaje: 'Artículo no encontrado' });
+        }
       }
 
       const movimientos = await EnseresModel.obtenerHistorialKardex(idEnser);
       return res.status(200).json({
-        articulo: enser.Nombre_Articulo,
-        existenciasActuales: enser.Total_Existencias,
+        articulo: articulo ? articulo.Nombre_Articulo : null,
+        existenciasActuales: articulo ? articulo.Total_Existencias : null,
         totalMovimientos: movimientos.length,
         movimientos
       });
