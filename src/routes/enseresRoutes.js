@@ -12,8 +12,8 @@ router.get('/kardex/todos', permitirRoles(1, 4), EnseresController.verHistorial)
 router.get('/:idEnser/kardex', permitirRoles(1, 4), EnseresController.verHistorial);
 
 // Modificación y bajas exclusivo para Administradores (1)
-router.post('/', permitirRoles(1), EnseresController.crear);
-router.put('/:id', permitirRoles(1), EnseresController.actualizar);
+router.post('/', permitirRoles(1, 4), EnseresController.crear);
+router.put('/:id', permitirRoles(1, 4), EnseresController.actualizar);
 router.patch('/:id/estado', permitirRoles(1), EnseresController.alternarEstado);
 
 module.exports = router;
