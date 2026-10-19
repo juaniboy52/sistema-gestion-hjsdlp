@@ -224,6 +224,13 @@ let tokenActual = sessionStorage.getItem('token_hermandad') || null;
 let usuarioActual = JSON.parse(sessionStorage.getItem('usuario_hermandad') || '{}');
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  const sesionDevotoAlCargar = localStorage.getItem('sesion_devoto');
+  if (sesionDevotoAlCargar) {
+    const liNav = document.getElementById('nav-item-portal-devoto');
+    if (liNav) liNav.classList.remove('d-none');
+  }
+
   if (tokenActual) {
     iniciarSesionEnFrontend(tokenActual, usuarioActual);
 
@@ -249,6 +256,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // 1. Navegación SPA
 
 function navegarA(vistaId) {
+  // Persistencia de visibilidad del botón de retorno para Devotos
+  setTimeout(() => {
+    const sesionDev = localStorage.getItem('sesion_devoto');
+    const liNav = document.getElementById('nav-item-portal-devoto');
+    if (liNav) {
+      if (sesionDev) {
+        liNav.classList.remove('d-none');
+      } else {
+        liNav.classList.add('d-none');
+      }
+    }
+  }, 10);
+  if (arguments[0] === 'vista-portal-devoto') {
+    const sesion = localStorage.getItem('sesion_devoto');
+    if (!sesion) { alert('Esta sección es exclusiva para devotos registrados.'); return; }
+  }
   // 1. Ocultar todas las secciones SPA
   document.querySelectorAll('.seccion-spa, section').forEach(s => s.classList.add('d-none'));
 
@@ -3105,5 +3128,272 @@ window.ejecutarSorteoTurnosAnda = async function() {
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-shuffle me-1"></i>Sortear Turnos';
     }
+  }
+};
+
+
+// ==========================================
+// CU006: PORTAL DEL DEVOTO
+// ==========================================
+let devotoSesionActual = null;
+
+window.iniciarSesionDevoto = async function(e) {
+  if (e) e.preventDefault();
+  const alerta = document.getElementById('login-alerta');
+  const dpi = document.getElementById('login-devoto-dpi').value.trim();
+  const correo = document.getElementById('login-devoto-correo').value.trim();
+
+  if (!dpi || !correo) {
+    if (alerta) {
+      alerta.textContent = 'Por favor complete su DPI y correo registrado.';
+      alerta.classList.remove('d-none');
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/login-devoto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dpi, correo })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (alerta) {
+        alerta.textContent = data.mensaje || 'Credenciales no coincidentes.';
+        alerta.classList.remove('d-none');
+      }
+      return;
+    }
+
+    // Cerrar modal
+    const modalEl = document.getElementById('modalLogin');
+    if (modalEl) {
+      const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modal.hide();
+    }
+
+    // Guardar token y datos
+    localStorage.setItem('token_hjsdlp', data.token);
+    localStorage.removeItem('sesion_devoto');
+    const navDevoto = document.getElementById('nav-item-portal-devoto');
+    if (navDevoto) navDevoto.classList.add('d-none');
+    const vistaDev = document.getElementById('vista-portal-devoto');
+    if (vistaDev) vistaDev.classList.add('d-none');
+
+    localStorage.setItem('sesion_devoto', JSON.stringify(data));
+    devotoSesionActual = data;
+
+    mostrarPortalDevoto(data);
+  } catch (err) {
+    console.error('Error al iniciar sesión devoto:', err);
+    if (alerta) {
+      alerta.textContent = 'Error de conexión con el servidor.';
+      alerta.classList.remove('d-none');
+    }
+  }
+};
+
+window.mostrarPortalDevoto = function(data) {
+
+  const liNavDevoto = document.getElementById('nav-item-portal-devoto');
+  if (liNavDevoto) liNavDevoto.classList.remove('d-none');
+  
+  // Quitar active de Portal Público y ponerlo en Mi Portal Devoto
+  document.querySelectorAll('#menuPrincipal .nav-link').forEach(l => l.classList.remove('active'));
+  if (liNavDevoto) {
+    const linkA = liNavDevoto.querySelector('a');
+    if (linkA) linkA.classList.add('active');
+  }
+
+  if (!data || !data.devoto) {
+    console.warn('Acceso restringido: Solo para devotos registrados.');
+    return;
+  }
+  // Ocultar vistas SPA
+  document.querySelectorAll('.seccion-spa').forEach(sec => sec.classList.add('d-none'));
+  
+  // Ocultar barra admin si estuviese visible
+  const navModulos = document.getElementById('navbar-modulos');
+  if (navModulos) navModulos.classList.add('d-none');
+
+  // Mostrar vista devoto
+  const vistaDev = document.getElementById('vista-portal-devoto');
+  if (vistaDev) vistaDev.classList.remove('d-none');
+
+  // Actualizar datos de sesión en navbar
+  const btnLogin = document.getElementById('btn-abrir-login');
+  const infoSesion = document.getElementById('info-sesion');
+  const btnSalir = document.getElementById('btn-cerrar-sesion');
+  const nombreSesion = document.getElementById('nombre-usuario-sesion');
+  const badgeRol = document.getElementById('badge-rol-sesion');
+
+  if (btnLogin) btnLogin.classList.add('d-none');
+  if (infoSesion) infoSesion.classList.remove('d-none');
+  if (btnSalir) {
+    btnSalir.classList.remove('d-none');
+    btnSalir.setAttribute('onclick', 'cerrarSesionDevoto()');
+  }
+  if (nombreSesion) nombreSesion.textContent = data.devoto.nombreCompleto;
+  if (badgeRol) {
+    badgeRol.textContent = 'DEVOTO CARGADOR';
+    badgeRol.className = 'badge bg-warning text-dark font-cinzel';
+  }
+
+  // Renderizar campos del Portal
+  document.getElementById('devoto-portal-nombre').textContent = data.devoto.nombreCompleto;
+  document.getElementById('devoto-portal-dpi').textContent = data.devoto.dpi;
+  document.getElementById('devoto-portal-antiguedad').textContent = `${data.devoto.antiguedadAnios} Años`;
+  document.getElementById('devoto-portal-fecha-reg').textContent = data.devoto.fechaRegistro 
+    ? `Registrado desde: ${new Date(data.devoto.fechaRegistro).toLocaleDateString('es-GT')}`
+    : 'Registrado en padrón general';
+
+  document.getElementById('devoto-portal-estatura').textContent = data.devoto.estaturaHombroCm 
+    ? `${Number(data.devoto.estaturaHombroCm).toFixed(1)} cm`
+    : 'No registrada';
+
+  // Tarjeta de Inscripción Cuaresma 2026
+  const estadoTitulo = document.getElementById('devoto-portal-estado-titulo');
+  const estadoDesc = document.getElementById('devoto-portal-estado-desc');
+  const iconoEstado = document.getElementById('devoto-portal-icono-estado');
+  const cardEstado = document.getElementById('card-estado-inscripcion');
+
+  if (data.inscripcionActual) {
+    estadoTitulo.textContent = 'Inscripción Activa';
+    estadoTitulo.className = 'fw-bold mb-0 text-success';
+    estadoDesc.textContent = `Recibo: ${data.inscripcionActual.Numero_Recibo || 'N/A'} (Q${Number(data.inscripcionActual.Monto_Quetzales || 50).toFixed(2)})`;
+    iconoEstado.className = 'bi bi-check-circle-fill text-success fs-4';
+    cardEstado.style.borderColor = '#198754';
+  } else {
+    estadoTitulo.textContent = 'Inscripción Pendiente';
+    estadoTitulo.className = 'fw-bold mb-0 text-warning';
+    estadoDesc.textContent = 'Aún no registra pago validado para el cortejo 2026.';
+    iconoEstado.className = 'bi bi-exclamation-circle-fill text-warning fs-4';
+    cardEstado.style.borderColor = '#ffc107';
+  }
+
+  // Turnos Históricos
+  const turnos = data.turnosHistorial || [];
+  const turnosVacio = document.getElementById('devoto-portal-turnos-vacio');
+  const turnosTablaWrap = document.getElementById('devoto-portal-turnos-tabla-wrap');
+  const tbodyTurnos = document.getElementById('devoto-portal-turnos-body');
+  document.getElementById('devoto-portal-total-turnos').textContent = `${turnos.length} Turnos`;
+
+  if (turnos.length === 0) {
+    if (turnosVacio) turnosVacio.classList.remove('d-none');
+    if (turnosTablaWrap) turnosTablaWrap.classList.add('d-none');
+  } else {
+    if (turnosVacio) turnosVacio.classList.add('d-none');
+    if (turnosTablaWrap) turnosTablaWrap.classList.remove('d-none');
+    
+    tbodyTurnos.innerHTML = turnos.map(t => `
+      <tr>
+        <td class="fw-bold font-cinzel text-morado">${t.Anio_Cuaresma || '---'}</td>
+        <td>
+          <strong>${t.Nombre_Anda || 'Cortejo Procesional'}</strong><br>
+          <small class="text-muted">${t.Cantidad_Brazos ? t.Cantidad_Brazos + ' Brazos' : 'Hermandad de la Paz'}</small>
+        </td>
+        <td class="text-center">
+          <span class="badge font-cinzel px-2 py-1" style="background-color: #4a154b !important; color: #ffffff !important; border: 1px solid #d4af37;">Turno ${t.Numero_Turno != null ? t.Numero_Turno : '---'}</span>
+        </td>
+        <td class="text-center fw-bold text-dark font-cinzel">
+          ${t.Brazo_Asignado ? ('Brazo ' + t.Brazo_Asignado) : 'Por Asignar'}
+        </td>
+        <td class="text-center small text-muted font-monospace">
+          ${t.Codigo_Verificacion || '---'}
+        </td>
+        <td>
+          <span class="badge ${t.Estado_Inscripcion === 'CANCELADO' ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'} small">
+            <i class="bi bi-patch-check-fill me-1"></i>${t.Estado_Inscripcion || 'Asignado'}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+  }
+};
+
+window.cerrarSesionDevoto = function() {
+  localStorage.removeItem('token_hjsdlp');
+  localStorage.removeItem('sesion_devoto');
+  devotoSesionActual = null;
+  window.location.reload();
+};
+
+window.abrirModalActualizarContactoDevoto = function() {
+  if (!devotoSesionActual || !devotoSesionActual.devoto) return;
+  document.getElementById('devoto-edit-telefono').value = devotoSesionActual.devoto.telefono || '';
+  document.getElementById('devoto-edit-correo').value = devotoSesionActual.devoto.correo || '';
+  const modal = new bootstrap.Modal(document.getElementById('modalActualizarContactoDevoto'));
+  modal.show();
+};
+
+window.guardarContactoDevoto = async function(e) {
+  if (e) e.preventDefault();
+  if (!devotoSesionActual || !devotoSesionActual.devoto) return;
+
+  const id = devotoSesionActual.devoto.id;
+  const telefono = document.getElementById('devoto-edit-telefono').value.trim();
+  const correo = document.getElementById('devoto-edit-correo').value.trim();
+
+  try {
+    const res = await fetch(`/api/devoto/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token_hjsdlp')}`
+      },
+      body: JSON.stringify({
+        dpi: devotoSesionActual.devoto.dpi,
+        nombres: devotoSesionActual.devoto.nombres,
+        apellidos: devotoSesionActual.devoto.apellidos,
+        telefono,
+        correo,
+        estaturaHombroCm: devotoSesionActual.devoto.estaturaHombroCm
+      })
+    });
+
+    if (!res.ok) throw new Error('No se pudo actualizar el contacto');
+
+    devotoSesionActual.devoto.telefono = telefono;
+    devotoSesionActual.devoto.correo = correo;
+    localStorage.setItem('sesion_devoto', JSON.stringify(devotoSesionActual));
+
+    const modalEl = document.getElementById('modalActualizarContactoDevoto');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    alert('Datos de contacto actualizados correctamente.');
+  } catch (err) {
+    console.error('Error al actualizar contacto devoto:', err);
+    alert('Error al actualizar datos de contacto.');
+  }
+};
+
+// Restaurar sesión de devoto si recarga
+document.addEventListener('DOMContentLoaded', () => {
+  const sesionGuardada = localStorage.getItem('sesion_devoto');
+  if (sesionGuardada) {
+    try {
+      devotoSesionActual = JSON.parse(sesionGuardada);
+      mostrarPortalDevoto(devotoSesionActual);
+    } catch (e) {
+      console.warn('Sesión devoto inválida');
+    }
+  }
+});
+
+window.volverAlPortalDevoto = function() {
+  const sesion = localStorage.getItem('sesion_devoto');
+  if (!sesion) {
+    if (typeof navegarA === 'function') navegarA('vista-bienvenida');
+    return;
+  }
+  try {
+    const data = JSON.parse(sesion);
+    mostrarPortalDevoto(data);
+  } catch (err) {
+    console.error('Error al restaurar portal del devoto:', err);
   }
 };

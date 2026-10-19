@@ -120,7 +120,7 @@ const FinanzasController = {
 
       // 2. Consultar anda
       const anda = await getQuery(
-        'SELECT ID_Anda, Nombre_Anda, Anio_Temporada, Inscripciones_Abiertas FROM Configuracion_Anda WHERE ID_Anda = ?',
+        'SELECT ID_Anda, Nombre_Anda, Anio_Temporada, Cantidad_Brazos, Cantidad_Turnos, Inscripciones_Abiertas FROM Configuracion_Anda WHERE ID_Anda = ?',
         [idAnda]
       );
       if (!anda) {
@@ -132,6 +132,28 @@ const FinanzasController = {
         return res.status(403).json({
           mensaje: `El periodo de inscripciones para el cortejo "${anda.Nombre_Anda}" se encuentra CERRADO temporalmente.`
         });
+      }
+
+      // Validar aforo y capacidad máxima del anda
+      const brazos = Number(anda.Cantidad_Brazos) || 0;
+      const turnos = Number(anda.Cantidad_Turnos) || 0;
+      const capacidadMaxima = brazos * turnos;
+
+      if (capacidadMaxima > 0) {
+        const inscritosActuales = await getQuery(
+          `SELECT COUNT(*) AS total 
+           FROM Asignacion_Turno 
+           WHERE ID_Anda = ? AND Anio_Cuaresma = ? 
+             AND Estado_Inscripcion IN ('PAGADO', 'Asignado', 'ASIGNADO')`,
+          [idAnda, anioCuaresma]
+        );
+
+        const totalInscritos = Number(inscritosActuales?.total || 0);
+        if (totalInscritos >= capacidadMaxima) {
+          return res.status(409).json({
+            mensaje: `Cupos agotados. El cortejo "${anda.Nombre_Anda}" alcanzó su capacidad máxima de ${capacidadMaxima} devotos (${totalInscritos} registrados).`
+          });
+        }
       }
 
       // 3. Validar si ya cuenta con inscripción pagada en esa anda este año
