@@ -2661,6 +2661,176 @@ window.filtrarKardexPorArticulo = function(idEnser) {
   }
 };
 
+window.filtrarKardexCombinado = function() {
+  const selArticulo = document.getElementById('filtro-kardex-articulo');
+  const inputInicio = document.getElementById('filtro-kardex-fecha-inicio');
+  const inputFin = document.getElementById('filtro-kardex-fecha-fin');
+
+  const idEnser = selArticulo ? selArticulo.value : '';
+  const fInicio = inputInicio ? inputInicio.value : '';
+  const fFin = inputFin ? inputFin.value : '';
+
+  let filtrados = listaMovimientosKardexGlobal.slice();
+
+  if (idEnser) {
+    filtrados = filtrados.filter(m => m.ID_Enser == idEnser);
+  }
+
+  if (fInicio) {
+    filtrados = filtrados.filter(m => {
+      const fechaMov = m.Fecha_Movimiento ? m.Fecha_Movimiento.substring(0, 10) : '';
+      return fechaMov >= fInicio;
+    });
+  }
+
+  if (fFin) {
+    filtrados = filtrados.filter(m => {
+      const fechaMov = m.Fecha_Movimiento ? m.Fecha_Movimiento.substring(0, 10) : '';
+      return fechaMov <= fFin;
+    });
+  }
+
+  renderizarTablaKardexGeneral(filtrados);
+};
+
+window.limpiarFiltrosKardex = function() {
+  const selArticulo = document.getElementById('filtro-kardex-articulo');
+  const inputInicio = document.getElementById('filtro-kardex-fecha-inicio');
+  const inputFin = document.getElementById('filtro-kardex-fecha-fin');
+
+  if (selArticulo) selArticulo.value = '';
+  if (inputInicio) inputInicio.value = '';
+  if (inputFin) inputFin.value = '';
+
+  renderizarTablaKardexGeneral(listaMovimientosKardexGlobal);
+};
+
+window.exportarReporteKardexPDF = function() {
+  const selArticulo = document.getElementById('filtro-kardex-articulo');
+  const inputInicio = document.getElementById('filtro-kardex-fecha-inicio');
+  const inputFin = document.getElementById('filtro-kardex-fecha-fin');
+
+  const idEnser = selArticulo ? selArticulo.value : '';
+  const fInicio = inputInicio ? inputInicio.value : '';
+  const fFin = inputFin ? inputFin.value : '';
+  const nombreArticulo = (selArticulo && selArticulo.options[selArticulo.selectedIndex]) 
+    ? selArticulo.options[selArticulo.selectedIndex].text 
+    : 'Todos los artículos';
+
+  let datos = listaMovimientosKardexGlobal.slice();
+
+  if (idEnser) {
+    datos = datos.filter(m => m.ID_Enser == idEnser);
+  }
+  if (fInicio) {
+    datos = datos.filter(m => (m.Fecha_Movimiento ? m.Fecha_Movimiento.substring(0, 10) : '') >= fInicio);
+  }
+  if (fFin) {
+    datos = datos.filter(m => (m.Fecha_Movimiento ? m.Fecha_Movimiento.substring(0, 10) : '') <= fFin);
+  }
+
+  let filasHTML = '';
+  if (datos.length === 0) {
+    filasHTML = '<tr><td colspan="6" style="text-align:center; padding: 15px; color: #777;">No se encontraron movimientos registrados en este rango de fechas.</td></tr>';
+  } else {
+    datos.forEach((m, idx) => {
+      const esEntrada = (m.Tipo_Movimiento || '').toUpperCase() === 'ENTRADA';
+      const colorTipo = esEntrada ? '#15803d' : '#b91c1c';
+      const bgTipo = esEntrada ? '#dcfce7' : '#fee2e2';
+      const signo = esEntrada ? '+' : '-';
+      
+      filasHTML += `
+        <tr style="border-bottom: 1px solid #e5e7eb; ${idx % 2 === 0 ? 'background-color: #f9fafb;' : ''}">
+          <td style="padding: 7px 10px; font-size: 11px;">${m.Fecha_Movimiento ? new Date(m.Fecha_Movimiento).toLocaleString('es-GT') : 'N/A'}</td>
+          <td style="padding: 7px 10px; font-weight: bold; font-size: 11px;">${m.Nombre_Articulo || 'N/A'}</td>
+          <td style="padding: 7px 10px; text-align: center;">
+            <span style="background-color: ${bgTipo}; color: ${colorTipo}; font-weight: bold; font-size: 10px; padding: 2px 7px; border-radius: 4px;">
+              ${(m.Tipo_Movimiento || 'N/A').toUpperCase()}
+            </span>
+          </td>
+          <td style="padding: 7px 10px; text-align: center; font-weight: bold; color: ${colorTipo}; font-size: 11px;">
+            ${signo}${m.Cantidad || 0}
+          </td>
+          <td style="padding: 7px 10px; font-size: 11px;">${m.Estado_Conservacion || m.Detalles || 'Bueno'}</td>
+          <td style="padding: 7px 10px; font-size: 11px;">${m.Responsable || m.Nombre_Usuario || 'Encargado de Enseres'}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const logoImg = document.querySelector('nav img, .navbar-brand img, img[alt*="Logo"]') ? document.querySelector('nav img, .navbar-brand img, img[alt*="Logo"]').src : '';
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Reporte de Kardex e Inventario</title>
+      <style>
+        @page { size: letter portrait; margin: 12mm 15mm; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1f2937; margin: 0; padding: 15px; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #4a154b; padding-bottom: 10px; margin-bottom: 15px; }
+        .titulo { font-size: 16px; font-weight: bold; color: #4a154b; text-transform: uppercase; margin: 0; }
+        .subtitulo { font-size: 12px; color: #4b5563; margin: 3px 0 0 0; }
+        .info-filtros { background-color: #f3f4f6; border-radius: 6px; padding: 8px 12px; margin-bottom: 15px; font-size: 11px; display: flex; justify-content: space-between; flex-wrap: wrap; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background-color: #4a154b; color: #ffffff; padding: 7px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .footer { margin-top: 25px; border-top: 1px dashed #9ca3af; padding-top: 8px; font-size: 10px; color: #6b7280; display: flex; justify-content: space-between; }
+        .btn-imprimir { position: fixed; bottom: 20px; right: 20px; background: #4a154b; color: white; border: none; padding: 10px 18px; font-size: 13px; font-weight: bold; border-radius: 20px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        @media print { .btn-imprimir { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          ${logoImg ? `<img src="${logoImg}" style="height: 60px; width: auto; object-fit: contain;">` : ''}
+          <div>
+            <h1 class="titulo">Hermandad de Jesús Sepultado de la Paz</h1>
+            <p class="subtitulo">Iglesia Cristo Rey, Parroquia San Mateo Apóstol • Inventario de Enseres y Bienes</p>
+          </div>
+        </div>
+        <div style="text-align: right; font-size: 10px; color: #6b7280;">
+          <strong>REPORTE DE KARDEX</strong><br>
+          Generado: ${new Date().toLocaleString('es-GT')}
+        </div>
+      </div>
+
+      <div class="info-filtros">
+        <div><strong>Artículo:</strong> ${nombreArticulo}</div>
+        <div><strong>Periodo:</strong> ${fInicio ? fInicio : 'Inicio'} al ${fFin ? fFin : 'Presente'}</div>
+        <div><strong>Total Movimientos:</strong> ${datos.length}</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha / Hora</th>
+            <th>Artículo</th>
+            <th style="text-align: center;">Tipo</th>
+            <th style="text-align: center;">Cantidad</th>
+            <th>Estado / Detalle</th>
+            <th>Responsable</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filasHTML}
+        </tbody>
+      </table>
+
+      <div class="footer">
+        <div>Sistema de Gestión Parroquial H.J.S.D.L.P.</div>
+        <div>Documento Institucional de Control y Auditoría Interna</div>
+      </div>
+
+      <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar en PDF</button>
+    </body>
+    </html>
+  `);
+  ventana.document.close();
+};
+
+
 function renderizarTablaKardexGeneral(movs) {
   const tbody = document.getElementById('tabla-kardex-general-body');
   if (!tbody) return;
