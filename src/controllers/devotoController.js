@@ -35,8 +35,9 @@ const DevotoController = {
   // POST /api/devotos
   async registrarDevoto(req, res) {
     try {
-      const { dpi, nombres, apellidos, telefono, correo, estaturaHombroCm } = req.body;
+      const { dpi: dpiInput, cui, nombres, apellidos, telefono, correo, estaturaHombroCm } = req.body;
 
+      const dpi = dpiInput || cui;
       if (!dpi || !nombres || !apellidos || !telefono || !correo || estaturaHombroCm === undefined) {
         return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
       }
@@ -69,8 +70,9 @@ const DevotoController = {
   async actualizarDevoto(req, res) {
     try {
       const { id } = req.params;
-      const { dpi, nombres, apellidos, telefono, correo, estaturaHombroCm, estadoActivo } = req.body;
+      const { dpi: dpiInput, cui, nombres, apellidos, telefono, correo, estaturaHombroCm, estadoActivo } = req.body;
 
+      const dpi = dpiInput || cui;
       if (!dpi || !nombres || !apellidos || !telefono || !correo || estaturaHombroCm === undefined) {
         return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
       }

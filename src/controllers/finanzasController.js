@@ -146,8 +146,14 @@ const FinanzasController = {
       await runQuery(
         `INSERT INTO Asignacion_Turno (
           ID_Devoto, ID_Anda, Anio_Cuaresma, Numero_Turno, Brazo_Asignado, Codigo_Verificacion, Estado_Inscripcion, Fecha_Asignacion
-        ) VALUES (?, ?, ?, NULL, NULL, ?, 'PAGADO', CURRENT_TIMESTAMP)`,
+        ) VALUES (?, ?, ?, 0, NULL, ?, 'PAGADO', CURRENT_TIMESTAMP)`,
         [idDevoto, idAnda, anioCuaresma, codigoValidacion]
+      );
+
+      // 4.1 Actualizar estado y vinculación del devoto
+      await runQuery(
+        'UPDATE Devoto SET ID_Anda = ?, Turno_Pagado = 1 WHERE ID_Devoto = ?',
+        [idAnda, idDevoto]
       );
 
       // 5. Registrar transacción financiera de ingreso

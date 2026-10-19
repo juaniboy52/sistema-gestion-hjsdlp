@@ -269,8 +269,33 @@
         </button>
       </div>
 
-      <div class="card card-custom">
+      <div class="card card-custom shadow-sm border-0 rounded-4">
         <div class="card-body p-4">
+          <!-- Barra de Búsqueda de Devotos -->
+          <div class="row g-2 align-items-center mb-3">
+            <div class="col-md-6 col-lg-5">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-morado text-morado">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input 
+                  type="text" 
+                  id="input-buscar-devoto" 
+                  class="form-control border-morado" 
+                  placeholder="Buscar por DPI, nombre o teléfono..." 
+                  oninput="filtrarDevotos()" 
+                  autocomplete="off"
+                >
+                <button class="btn btn-outline-secondary" type="button" onclick="limpiarBuscadorDevotos()" title="Limpiar búsqueda">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-7 text-md-end text-muted small" id="contador-devotos-padron">
+              Cargando devotos...
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
               <thead class="table-light font-cinzel small">
@@ -309,7 +334,26 @@
             <div class="card-body p-3">
               <form id="form-cobro-turno">
                 <div class="mb-2">
-                  <label class="form-label small fw-bold">Devoto Cargador</label>
+                  <label class="form-label small fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-person-fill text-morado me-1"></i>Devoto Cargador</span>
+                    <span id="contador-filtro-caja" class="badge bg-light text-muted fw-normal" style="font-size: 10px;"></span>
+                  </label>
+                  <div class="input-group input-group-sm mb-1">
+                    <span class="input-group-text bg-white text-morado border-morado">
+                      <i class="bi bi-search"></i>
+                    </span>
+                    <input 
+                      type="text" 
+                      id="filtro-cobro-devoto" 
+                      class="form-control border-morado" 
+                      placeholder="Buscar por DPI, nombre o teléfono..." 
+                      oninput="filtrarSelectDevotos()" 
+                      autocomplete="off"
+                    >
+                    <button class="btn btn-outline-secondary" type="button" onclick="limpiarFiltroCobroDevoto()" title="Limpiar búsqueda">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
                   <select id="cobro-devoto-select" class="form-select form-select-sm" required>
                     <option value="">Seleccione un cargador...</option>
                   </select>
@@ -616,7 +660,8 @@
             <input type="date" id="filtro-reporte-hasta" class="form-control form-control-sm">
           </div>
           <div class="col-md-2 d-flex gap-1">
-            <button class="btn btn-morado text-white btn-sm w-100 fw-bold" onclick="cargarReportes()"><i class="bi bi-filter me-1"></i>Filtrar</button>
+            <button class="btn btn-morado text-white btn-sm fw-bold flex-grow-1" onclick="cargarReportes()"><i class="bi bi-filter me-1"></i>Filtrar</button>
+            <button class="btn btn-outline-danger btn-sm fw-bold px-2" onclick="exportarReporteContablePDF()" title="Exportar reporte a PDF"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
             <button class="btn btn-outline-secondary btn-sm" onclick="limpiarFiltrosReportes()" title="Limpiar filtros"><i class="bi bi-x-circle"></i></button>
           </div>
         </div>
@@ -728,20 +773,49 @@
 
     <!-- 8. AUDITORÍA -->
     <section id="vista-auditoria" class="seccion-spa d-none">
-      <div class="card card-custom">
-        <div class="card-header-morado">
-          <h5 class="mb-0 font-cinzel"><i class="bi bi-shield-lock me-2"></i>Bitácora de Auditoría del Sistema</h5>
+      <div class="card card-custom shadow-sm mb-4">
+        <div class="card-header-morado d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 font-cinzel text-warning"><i class="bi bi-shield-lock me-2"></i>Bitácora de Auditoría y Seguridad</h5>
+          <button class="btn btn-sm btn-outline-light" onclick="cargarAuditoria()"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</button>
         </div>
         <div class="card-body p-4">
+          <!-- Filtros de Auditoría -->
+          <div class="card border-0 bg-light p-3 mb-3 rounded-3 shadow-sm">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-muted mb-1"><i class="bi bi-search me-1"></i>Buscar en Bitácora</label>
+                <input type="text" id="filtro-auditoria-buscar" class="form-control form-control-sm" placeholder="Módulo, acción, detalle, usuario o IP...">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1"><i class="bi bi-calendar-event me-1"></i>Desde</label>
+                <input type="date" id="filtro-auditoria-desde" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1"><i class="bi bi-calendar-event me-1"></i>Hasta</label>
+                <input type="date" id="filtro-auditoria-hasta" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-4 d-flex gap-1">
+                <button class="btn btn-morado text-white btn-sm fw-bold flex-grow-1" onclick="cargarAuditoria()"><i class="bi bi-filter me-1"></i>Filtrar</button>
+                <button class="btn btn-outline-danger btn-sm fw-bold px-3" onclick="exportarAuditoriaPDF()" title="Exportar bitácora a PDF"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="limpiarFiltrosAuditoria()" title="Limpiar filtros"><i class="bi bi-x-circle"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-2 small text-muted">
+            <span id="contador-auditoria"><i class="bi bi-shield-check text-morado me-1"></i>Cargando eventos...</span>
+          </div>
+
           <div class="table-responsive">
             <table class="table table-hover align-middle font-monospace small mb-0">
               <thead class="table-light">
                 <tr>
                   <th>Fecha/Hora</th>
-                  <th>Usuario</th>
+                  <th>Usuario Responsable</th>
                   <th>Módulo</th>
                   <th>Acción</th>
-                  <th>IP</th>
+                  <th>Detalle</th>
+                  <th>IP Origen</th>
                 </tr>
               </thead>
               <tbody id="tabla-auditoria-body"></tbody>
