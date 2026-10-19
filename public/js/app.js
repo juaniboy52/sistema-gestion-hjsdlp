@@ -2885,3 +2885,55 @@ window.mostrarBienvenidaLogin = function(usuario) {
     console.error('Error al abrir modalBienvenidaUsuario:', err);
   }
 };
+
+// ==========================================
+// FUNCIÓN DE SORTEO Y ASIGNACIÓN DE TURNOS
+// ==========================================
+window.ejecutarSorteoTurnosAnda = async function() {
+  try {
+    const sel = document.getElementById('select-anda-visualizar');
+    const idAnda = sel ? sel.value : 1;
+
+    if (!idAnda) {
+      alert('Por favor selecciona un anda procesional primero.');
+      return;
+    }
+
+    const confirmar = confirm('¿Deseas ejecutar el sorteo de turnos y brazos por altura para este cortejo? Los devotos pagados serán organizados y asignados equitativamente.');
+    if (!confirmar) return;
+
+    const btn = document.getElementById('btn-sorteo-turnos');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sorteando...';
+    }
+
+    const res = await fetchAutenticado('/andas/' + idAnda + '/sorteo', {
+      method: 'POST'
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.mensaje || 'Error al ejecutar el sorteo');
+    }
+
+    alert('¡Sorteo finalizado exitosamente!\nDevotos asignados: ' + (data.resultado?.totalAsignados || 0) + '\nTurnos conformados: ' + (data.resultado?.turnosGenerados || 0));
+
+    // Refrescar la vista actual del visualizador
+    if (typeof cambiarAndaVisualizador === 'function') {
+      cambiarAndaVisualizador(idAnda);
+    } else {
+      location.reload();
+    }
+  } catch (err) {
+    console.error('Error al ejecutar sorteo:', err);
+    alert('Error al ejecutar el sorteo: ' + err.message);
+  } finally {
+    const btn = document.getElementById('btn-sorteo-turnos');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-shuffle me-1"></i>Sortear Turnos';
+    }
+  }
+};

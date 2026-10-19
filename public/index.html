@@ -492,44 +492,65 @@
 
       <!-- GESTIÓN Y SELECCIÓN DE ANDAS -->
       <div class="card card-custom shadow-sm border-0 mb-3 p-3 bg-white rounded-4">
-        <div class="row g-3 align-items-center">
-          <div class="col-md-5">
-            <label class="form-label small fw-bold text-morado mb-1">
-              <i class="bi bi-diagram-3-fill me-1"></i>Seleccionar Anda / Cortejo Procesional:
-            </label>
-            <select id="select-anda-visualizar" class="form-select fw-bold border-morado" onchange="cambiarAndaVisualizador(this.value)">
-              <option value="">Cargando andas...</option>
-            </select>
+        <div class="row g-3 align-items-end mb-3">
+          <!-- LADO IZQUIERDO: SELECTORES Y GESTIÓN DE ANDA -->
+          <div class="col-12 col-xl-7">
+            <div class="row g-2 align-items-end">
+              <!-- Selector de Anda con sus botones de gestión -->
+              <div class="col-12 col-md-7">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label small fw-bold text-morado mb-0">
+                    <i class="bi bi-diagram-3-fill me-1"></i>Seleccionar Anda / Cortejo:
+                  </label>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 me-2 text-morado fw-bold" onclick="abrirModalCrearAnda()" title="Crear nueva anda">
+                      <i class="bi bi-plus-circle me-1"></i>Nueva Anda
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 me-2 text-secondary fw-semibold" onclick="abrirModalEditarAnda()" title="Editar anda">
+                      <i class="bi bi-pencil-square me-1"></i>Editar
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-danger" onclick="confirmarDesactivarAnda()" title="Desactivar anda">
+                      <i class="bi bi-slash-circle me-1"></i>Desactivar
+                    </button>
+                  </div>
+                </div>
+                <select id="select-anda-visualizar" class="form-select fw-bold border-morado" onchange="cambiarAndaVisualizador(this.value)">
+                  <option value="">Cargando andas...</option>
+                </select>
+              </div>
+
+              <!-- Selector de Turno -->
+              <div class="col-12 col-md-5">
+                <label class="form-label small fw-bold text-morado mb-1">
+                  <i class="bi bi-clock-history me-1"></i>Turno a visualizar:
+                </label>
+                <select id="select-turno-visualizar" class="form-select border-morado" onchange="cargarDistribucionAnda()">
+                  <option value="1">Turno 1</option>
+                  <option value="2">Turno 2</option>
+                  <option value="3">Turno 3</option>
+                  <option value="4">Turno 4</option>
+                  <option value="5">Turno 5</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div class="col-md-3">
-            <label class="form-label small fw-bold text-morado mb-1">
-              <i class="bi bi-clock-history me-1"></i>Turno a visualizar:
-            </label>
-            <select id="select-turno-visualizar" class="form-select border-morado" onchange="cargarDistribucionAnda()">
-              <option value="1">Turno 1</option>
-              <option value="2">Turno 2</option>
-              <option value="3">Turno 3</option>
-              <option value="4">Turno 4</option>
-              <option value="5">Turno 5</option>
-            </select>
-          </div>
-          <div class="col-md-4 text-md-end pt-md-3">
-            <button type="button" class="btn btn-morado text-white btn-sm px-3 shadow-sm fw-bold me-1" onclick="abrirModalCrearAnda()">
-              <i class="bi bi-plus-circle me-1"></i>Nueva Anda
+
+          <!-- LADO DERECHO: SOLO SORTEAR TURNOS Y ABRIR INSCRIPCIONES -->
+          <div class="col-12 col-xl-5 d-flex justify-content-xl-end align-items-center gap-2 pt-2 pt-xl-0 ms-auto">
+            <!-- Botón Sortear Turnos -->
+            <button type="button" id="btn-sorteo-turnos" class="btn btn-warning btn-sm px-3 shadow-sm fw-bold text-dark" onclick="ejecutarSorteoTurnosAnda()" title="Sortear y nivelar devotos por altura">
+              <i class="bi bi-shuffle me-1"></i>Sortear Turnos
             </button>
-            <button type="button" class="btn btn-outline-morado btn-sm px-3 shadow-sm fw-bold me-1" onclick="abrirModalEditarAnda()">
-              <i class="bi bi-pencil-square me-1"></i>Editar Anda
-            </button>
-            <!-- BADGE Y BOTÓN DE APERTURA / CIERRE DE INSCRIPCIONES -->
-            <span id="badge-estado-inscripcion" class="badge bg-secondary d-inline-flex align-items-center px-2 py-1 me-1">
-              <i class="bi bi-clock me-1"></i>Inscripciones
-            </span>
-            <button type="button" id="btn-toggle-inscripcion-anda" class="btn btn-outline-success btn-sm px-3 shadow-sm fw-bold me-1" onclick="alternarInscripcionesAndaActual()">
-              <i class="bi bi-calendar-check me-1"></i>Abrir Inscripciones
-            </button>
-            <button type="button" class="btn btn-outline-danger btn-sm px-3 shadow-sm fw-bold" onclick="confirmarDesactivarAnda()">
-              <i class="bi bi-slash-circle me-1"></i>Desactivar
-            </button>
+
+            <!-- Control de Inscripciones (Badge + Botón) -->
+            <div class="d-inline-flex align-items-center shadow-sm rounded">
+              <span id="badge-estado-inscripcion" class="badge bg-secondary d-inline-flex align-items-center px-2 py-2 rounded-start rounded-0">
+                <i class="bi bi-clock me-1"></i>Inscripciones
+              </span>
+              <button type="button" id="btn-toggle-inscripcion-anda" class="btn btn-outline-success btn-sm px-3 fw-bold rounded-end rounded-0" onclick="alternarInscripcionesAndaActual()">
+                <i class="bi bi-calendar-check me-1"></i>Abrir Inscripciones
+              </button>
+            </div>
           </div>
         </div>
       </div>
