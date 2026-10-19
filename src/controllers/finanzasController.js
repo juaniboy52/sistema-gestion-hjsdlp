@@ -120,11 +120,18 @@ const FinanzasController = {
 
       // 2. Consultar anda
       const anda = await getQuery(
-        'SELECT ID_Anda, Nombre_Anda, Anio_Temporada FROM Configuracion_Anda WHERE ID_Anda = ?',
+        'SELECT ID_Anda, Nombre_Anda, Anio_Temporada, Inscripciones_Abiertas FROM Configuracion_Anda WHERE ID_Anda = ?',
         [idAnda]
       );
       if (!anda) {
         return res.status(404).json({ mensaje: 'Anda procesional no encontrada' });
+      }
+
+      // Validar periodo de inscripciones activo
+      if (Number(anda.Inscripciones_Abiertas) !== 1) {
+        return res.status(403).json({
+          mensaje: `El periodo de inscripciones para el cortejo "${anda.Nombre_Anda}" se encuentra CERRADO temporalmente.`
+        });
       }
 
       // 3. Validar si ya cuenta con inscripción pagada en esa anda este año

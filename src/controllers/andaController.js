@@ -57,6 +57,29 @@ const AndaController = {
   },
 
   
+    async toggleInscripciones(req, res) {
+    try {
+      const { id } = req.params;
+      const { runQuery, getQuery } = require('../config/database');
+
+      const anda = await getQuery('SELECT ID_Anda, Nombre_Anda, Inscripciones_Abiertas FROM Configuracion_Anda WHERE ID_Anda = ?', [id]);
+      if (!anda) {
+        return res.status(404).json({ mensaje: 'Anda no encontrada' });
+      }
+
+      const nuevoEstado = anda.Inscripciones_Abiertas === 1 ? 0 : 1;
+      await runQuery('UPDATE Configuracion_Anda SET Inscripciones_Abiertas = ? WHERE ID_Anda = ?', [nuevoEstado, id]);
+
+      return res.status(200).json({
+        mensaje: nuevoEstado === 1 ? 'Periodo de inscripciones aperturado' : 'Inscripciones cerradas para este cortejo',
+        inscripcionesAbiertas: nuevoEstado
+      });
+    } catch (error) {
+      console.error('Error al alternar inscripciones:', error);
+      return res.status(500).json({ mensaje: 'Error interno al actualizar estado de inscripciones' });
+    }
+  },
+
   async toggleEstado(req, res) {
     try {
       const idAnda = parseInt(req.params.id, 10);

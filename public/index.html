@@ -520,6 +520,13 @@
             <button type="button" class="btn btn-outline-morado btn-sm px-3 shadow-sm fw-bold me-1" onclick="abrirModalEditarAnda()">
               <i class="bi bi-pencil-square me-1"></i>Editar Anda
             </button>
+            <!-- BADGE Y BOTÓN DE APERTURA / CIERRE DE INSCRIPCIONES -->
+            <span id="badge-estado-inscripcion" class="badge bg-secondary d-inline-flex align-items-center px-2 py-1 me-1">
+              <i class="bi bi-clock me-1"></i>Inscripciones
+            </span>
+            <button type="button" id="btn-toggle-inscripcion-anda" class="btn btn-outline-success btn-sm px-3 shadow-sm fw-bold me-1" onclick="alternarInscripcionesAndaActual()">
+              <i class="bi bi-calendar-check me-1"></i>Abrir Inscripciones
+            </button>
             <button type="button" class="btn btn-outline-danger btn-sm px-3 shadow-sm fw-bold" onclick="confirmarDesactivarAnda()">
               <i class="bi bi-slash-circle me-1"></i>Desactivar
             </button>
@@ -1460,5 +1467,36 @@
       </div>
     </div>
   </div>
+
+  <!-- MODAL DE BIENVENIDA INSTITUCIONAL -->
+  <div class="modal fade" id="modalBienvenidaUsuario" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+      <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden text-center">
+        <div class="p-4" style="background: linear-gradient(135deg, #2b0833 0%, #4a0e4e 100%); color: #fff;">
+          <div class="mb-3 d-inline-flex p-3 rounded-circle" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 215, 0, 0.4);">
+            <i class="bi bi-shield-check" style="font-size: 2.8rem; color: #ffd700;"></i>
+          </div>
+          <h4 class="fw-bold mb-1" style="font-family: 'Cinzel', serif, sans-serif; letter-spacing: 0.5px;">¡Bienvenido(a)!</h4>
+          <p class="small text-white-50 mb-0">Hermandad de Jesús Sepultado de la Paz</p>
+        </div>
+        <div class="modal-body p-4 bg-white">
+          <p class="text-muted small mb-2 text-uppercase fw-semibold" style="letter-spacing: 1px;">Sesión iniciada correctamente</p>
+          <h5 id="bienvenida-nombre-usuario" class="fw-bold text-dark mb-2">Usuario</h5>
+          <div class="mb-3">
+            <span id="bienvenida-rol-usuario" class="badge px-3 py-2 text-white shadow-sm fw-bold" style="background-color: #581845; font-size: 0.85rem;">
+              ROL
+            </span>
+          </div>
+          <div class="progress mb-3" style="height: 4px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" role="progressbar" style="width: 100%"></div>
+          </div>
+          <button type="button" class="btn btn-morado w-100 py-2 rounded-3 fw-bold" data-bs-dismiss="modal">
+            Ingresar al Sistema
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

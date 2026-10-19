@@ -226,6 +226,11 @@ let usuarioActual = JSON.parse(sessionStorage.getItem('usuario_hermandad') || '{
 document.addEventListener('DOMContentLoaded', () => {
   if (tokenActual) {
     iniciarSesionEnFrontend(tokenActual, usuarioActual);
+
+    // Lanzar ventana modal de bienvenida institucional
+    if (typeof window.mostrarBienvenidaLogin === 'function') {
+      window.mostrarBienvenidaLogin(usuarioActual);
+    }
   } else {
     navegarA('vista-bienvenida');
   }
@@ -403,6 +408,13 @@ function iniciarSesionEnFrontend(token, usuario) {
 
   const idRol = Number(usuario.idRol || usuario.ID_Rol || 0);
   navegarA("vista-bienvenida");
+
+  // Disparar ventana modal de bienvenida tras completar la transición de vista
+  setTimeout(() => {
+    if (typeof window.mostrarBienvenidaLogin === 'function') {
+      window.mostrarBienvenidaLogin(usuario);
+    }
+  }, 300);
 }
 
 function cerrarSesion() {
@@ -431,7 +443,7 @@ function cerrarSesion() {
     alerta.classList.add('d-none');
   }
 
-  document.getElementById('navbar-principal').classList.add('d-none');
+  document.getElementById('navbar-principal')?.classList.add('d-none');
   navegarA('vista-bienvenida');
 }
 
@@ -686,6 +698,13 @@ async function manejarCobroTurno(e) {
 
   if (!idDevoto || !idAnda) {
     alert('Por favor selecciona tanto el cargador como el anda procesional.');
+    return;
+  }
+
+  const selectAnda = document.getElementById('cobro-anda-select');
+  const optAnda = selectAnda ? selectAnda.options[selectAnda.selectedIndex] : null;
+  if (optAnda && optAnda.dataset && optAnda.dataset.abiertas === '0') {
+    alert('Las inscripciones para este cortejo procesional están CERRADAS actualmente.');
     return;
   }
 
@@ -2743,5 +2762,126 @@ window.abrirHistorialKardex = async function(idEnser) {
   } catch (err) {
     console.error('Error al cargar historial individual:', err);
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Error al consultar el Kardex.</td></tr>';
+  }
+};
+
+
+// ==========================================
+// CONTROL DE PERIODO DE INSCRIPCIONES POR ANDA
+// ==========================================
+
+
+
+// ==========================================
+// CONTROL DE INSCRIPCIONES POR ANDA (ID EXACTO)
+// ==========================================
+window.alternarInscripcionesAndaActual = async function() {
+  const selAnda = document.getElementById('select-anda-visualizar');
+  const idAnda = selAnda ? selAnda.value : null;
+
+  if (!idAnda) {
+    alert('Por favor selecciona un anda / cortejo procesional primero.');
+    return;
+  }
+
+  try {
+    const res = await fetchAutenticado('/andas/' + idAnda + '/inscripciones', {
+      method: 'PATCH'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.mensaje || 'Error al cambiar periodo de inscripciones');
+
+    alert(data.mensaje);
+
+    // Actualizar visualmente el botón y badge de inmediato
+    window.actualizarBadgeInscripciones({ Inscripciones_Abiertas: data.inscripcionesAbiertas });
+
+    // Refrescar el visualizador si la función existe
+    if (typeof cambiarAndaVisualizador === 'function') {
+      cambiarAndaVisualizador(idAnda);
+    }
+  } catch (err) {
+    console.error('Error al alternar inscripciones:', err);
+    alert('Error: ' + err.message);
+  }
+};
+
+window.actualizarBadgeInscripciones = function(anda) {
+  const badge = document.getElementById('badge-estado-inscripcion');
+  const btn = document.getElementById('btn-toggle-inscripcion-anda');
+  if (!badge || !anda) return;
+
+  const abiertas = Number(anda.Inscripciones_Abiertas) === 1;
+
+  if (abiertas) {
+    badge.className = 'badge bg-success d-inline-flex align-items-center px-2 py-1 me-1';
+    badge.innerHTML = '<i class="bi bi-unlock-fill me-1"></i>Inscripciones Abiertas';
+    if (btn) {
+      btn.className = 'btn btn-outline-danger btn-sm px-3 shadow-sm fw-bold me-1';
+      btn.innerHTML = '<i class="bi bi-lock me-1"></i>Cerrar Inscripciones';
+    }
+  } else {
+    badge.className = 'badge bg-danger d-inline-flex align-items-center px-2 py-1 me-1';
+    badge.innerHTML = '<i class="bi bi-lock-fill me-1"></i>Inscripciones Cerradas';
+    if (btn) {
+      btn.className = 'btn btn-outline-success btn-sm px-3 shadow-sm fw-bold me-1';
+      btn.innerHTML = '<i class="bi bi-calendar-check me-1"></i>Abrir Inscripciones';
+    }
+  }
+};
+
+// ==========================================
+// DEFINICIÓN DE VENTANA DE BIENVENIDA
+// ==========================================
+window.mostrarBienvenidaLogin = function(usuario) {
+  try {
+    const modalEl = document.getElementById('modalBienvenidaUsuario');
+    if (!modalEl) {
+      console.warn('No se encontró el elemento #modalBienvenidaUsuario en el DOM.');
+      return;
+    }
+
+    const nombreEl = document.getElementById('bienvenida-nombre-usuario');
+    const rolEl = document.getElementById('bienvenida-rol-usuario');
+
+    if (nombreEl) {
+      const nombreCompleto = usuario?.Nombres 
+        ? `${usuario.Nombres} ${usuario.Apellidos || ''}`.trim()
+        : (usuario?.Usuario || usuario?.usuario || 'Hermano Devoto');
+      nombreEl.textContent = nombreCompleto;
+    }
+
+    if (rolEl) {
+      const rolesMap = {
+        1: 'Administrador General',
+        2: 'Secretaría',
+        3: 'Tesorero',
+        4: 'Encargado de Enseres',
+        5: 'Cajero Receptor'
+      };
+      const idRol = Number(usuario?.idRol || usuario?.ID_Rol || 0);
+      rolEl.textContent = usuario?.Nombre_Rol || rolesMap[idRol] || 'Usuario del Sistema';
+    }
+
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      // Limpiar modales previos y backdrops huérfanos
+      document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+      document.body.classList.remove('modal-open');
+
+      const modalInstancia = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl, { backdrop: 'static' });
+      modalInstancia.show();
+
+      // Cierre automático tras 2.5 segundos
+      setTimeout(() => {
+        try {
+          const inst = bootstrap.Modal.getInstance(modalEl);
+          if (inst) inst.hide();
+        } catch (e) {}
+      }, 2500);
+    } else {
+      console.warn('Bootstrap Modal no se encuentra disponible.');
+    }
+  } catch (err) {
+    console.error('Error al abrir modalBienvenidaUsuario:', err);
   }
 };
